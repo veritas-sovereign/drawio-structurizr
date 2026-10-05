@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 # drawio-structurizr with a pinned structurizr-cli, so --validate and --export work without Java on the host.
 
-FROM python:3.12-slim-bookworm
+# Base image pinned by digest (multi-arch index); Dependabot proposes updates.
+FROM python:3.12-slim-bookworm@sha256:54c85f3c47607a77f32adec749d3c81d1348bf25833671f512b26a9b6d778cb3
 
 # structurizr-cli release and the SHA-256 of its structurizr-cli.zip asset
 ARG STRUCTURIZR_CLI_VERSION=2025.11.09

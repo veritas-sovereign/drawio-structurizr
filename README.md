@@ -253,7 +253,20 @@ docker run --rm -v "$PWD:/work" ghcr.io/veritas-sovereign/drawio-structurizr:0.2
 
 On Linux, add `--user "$(id -u):$(id -g)"`, otherwise the files are written as user 10001.
 
-Images are published to GitHub Container Registry for `linux/amd64` and `linux/arm64` when a `v*` tag is pushed. To build locally: `docker build -t drawio-structurizr .`
+Images are published to GitHub Container Registry for `linux/amd64` and `linux/arm64` when a `v*` tag is pushed, each with an SBOM (software bill of materials) attached. To build locally: `docker build -t drawio-structurizr .`
+
+#### What is pinned
+
+| Part | Pinned to | Kept up to date by |
+| --- | --- | --- |
+| Base image | `python:3.12-slim-bookworm` by digest | Dependabot, weekly pull request for a new digest (stays on Python 3.12) |
+| structurizr-cli | v2025.11.09 and the SHA-256 of its zip (`ARG` defaults in the `Dockerfile`) | by hand: the upstream project is archived, so no new releases are expected |
+| GitHub Actions used by the workflows | major version tags (`@v4`, `@v6`, …) | Dependabot, weekly grouped pull request |
+| Java (`default-jre-headless`) and Debian packages | not pinned | whatever Debian bookworm ships when the image is built |
+
+Because Debian packages are not pinned, two builds of the same commit can differ in OS packages. Each published image tag is fixed once pushed, so pull a released tag (or its digest) when you need the exact same toolchain later.
+
+To change the structurizr-cli version, download the new `structurizr-cli.zip`, run `shasum -a 256 structurizr-cli.zip`, and update both `ARG` lines. The build fails if the checksum does not match, including when the upstream file is changed or removed.
 
 ## Validating with structurizr-cli
 
@@ -455,11 +468,13 @@ drawio-structurizr/
 │   ├── test_examples.py         end-to-end tests on the samples
 │   ├── test_emitter.py          mapper and emitter unit tests
 │   └── test_validate.py         choice of local CLI, Docker or skip
-├── .github/workflows/
-│   ├── test.yml                 runs pytest on Python 3.9 and 3.13
-│   ├── publish-image.yml        builds and smoke-tests the Docker image; pushes it to GHCR on v* tags
-│   └── publish-pypi.yml         builds the package; publishes it to PyPI on v* tags
-├── Dockerfile                   image with Python, Java and a pinned structurizr-cli
+├── .github/
+│   ├── dependabot.yml           weekly updates for the base image digest and GitHub Actions
+│   └── workflows/
+│       ├── test.yml             runs pytest on Python 3.9 and 3.13
+│       ├── publish-image.yml    builds and smoke-tests the Docker image; pushes it to GHCR on v* tags
+│       └── publish-pypi.yml     builds the package; publishes it to PyPI on v* tags
+├── Dockerfile                   image with Python, Java and a pinned structurizr-cli, on a digest-pinned base
 ├── .dockerignore
 ├── .pre-commit-hooks.yaml       the drawio-structurizr-check pre-commit hook
 ├── pyproject.toml               package metadata and drawio-structurizr command
