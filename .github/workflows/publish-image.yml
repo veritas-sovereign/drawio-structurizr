@@ -30,7 +30,11 @@ jobs:
       - name: Convert, validate and export a sample inside the image
         run: |
           docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/examples:/work" drawio-structurizr:test \
-            shop.drawio multipage.drawio -o merged.dsl -d --strict --validate-required --export mermaid --export-dir out
+            shop.drawio -o shop.dsl -d --strict --validate-required
+          test -s examples/shop.dsl
+          # the two samples disagree on Order API's technology, so merging them warns (C4-MERGE-003): no --strict
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/examples:/work" drawio-structurizr:test \
+            shop.drawio multipage.drawio -o merged.dsl -d --validate-required --export mermaid --export-dir out
           test -s examples/merged.dsl
           ls examples/out/*.mmd
       - name: --check (the pre-commit hook) exits 1 on problems and writes nothing
