@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-05
+
 ### Fixed
 
 - The Docker fallback for `--validate` and `--export` used `structurizr/cli:latest`, a newer build than the version pinned in this project's image. It now uses `structurizr/cli:2025.11.09`.
@@ -53,6 +55,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [0.1.0] - 2026-10-05
 
+Not published; the initial project structure.
+
 ### Added
 
 - `drawio-structurizr` command that converts a C4 draw.io diagram to a Structurizr DSL workspace (`mapper.py`, `emitter.py`, `main.py`).
@@ -71,5 +75,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Arrows that touch a shape without being attached are now repaired. The repair previously read the arrow's overall position, which is always (0, 0), instead of its end point.
 - Removed unused `tkinter` and `select` imports that crashed the scripts on Python builds without Tk.
 
-[Unreleased]: https://github.com/veritas-sovereign/drawio-structurizr/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/veritas-sovereign/drawio-structurizr/releases/tag/v0.1.0
+[Unreleased]: https://github.com/veritas-sovereign/drawio-structurizr/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/veritas-sovereign/drawio-structurizr/releases/tag/v0.2.0
+[0.1.0]: https://github.com/veritas-sovereign/drawio-structurizr/tree/a2d51d4

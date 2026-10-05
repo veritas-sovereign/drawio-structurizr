@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "drawio-structurizr"
-version = "0.1.0"
+version = "0.2.0"
 description = "Validate C4 draw.io diagrams and convert them to Structurizr DSL and Excel."
 readme = "README.md"
 license = "MIT"
