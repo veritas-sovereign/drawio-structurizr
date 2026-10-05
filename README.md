@@ -418,6 +418,17 @@ The first shape found supplies the name, description and technology; later shape
 
 **Relationships** are the same when they have the same `c4Id`, or the same source, target and description. That is how Structurizr identifies relationships, so two arrows between the same elements with the same description always become one, even if their technologies or tags differ. Tags are combined and the first technology is kept. Relationships sharing a `c4Id` are merged even if their ends or descriptions differ, with a `C4-MERGE-006` warning.
 
+### Output order
+
+The output does not depend on the order shapes, pages or arrows were drawn in: shuffling them gives byte-identical DSL, so diffs between runs only show real changes.
+
+- **Elements:** people, then software systems, containers and components, each sorted by name, nested under their parents.
+- **Identifiers:** assigned in that order, so when two elements need the same name, which one gets the `_2` suffix is stable.
+- **Relationships:** outer ones first (Structurizr rejects an explicit relationship that a nested one has already implied), then by source, target and description.
+- **Tags:** alphabetical.
+
+Merging still happens in drawing order, so when shapes conflict, "the first is kept" means the first one drawn, and the conflict is reported. When you pass several files, their order on the command line is the drawing order.
+
 Conflicts are reported:
 
 | Code | Severity | Meaning |
@@ -527,6 +538,7 @@ drawio-structurizr/
 │   ├── test_emitter.py          mapper and emitter unit tests
 │   ├── test_hierarchy.py        nesting errors and unknown shape types
 │   ├── test_identity.py         merging and merge conflicts
+│   ├── test_ordering.py         output order does not depend on drawing order
 │   ├── test_validate.py         choice of local CLI, Docker or skip
 │   ├── test_validate_required.py  --validate-required
 │   └── test_views.py            System Context views

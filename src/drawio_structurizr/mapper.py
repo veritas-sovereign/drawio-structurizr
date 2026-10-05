@@ -93,6 +93,22 @@ def _normalise(name):
     return name.strip().casefold()
 
 
+KIND_RANK = {"person": 0, "softwareSystem": 1, "container": 2, "component": 3}
+
+
+def _element_key(element):
+    return (KIND_RANK.get(element.kind, 9), _normalise(element.name), element.name, element.c4_id)
+
+
+def _path_key(element):
+    """Sort key from the root down, so the order does not depend on the drawing."""
+    path = []
+    while element is not None:
+        path.append(_element_key(element))
+        element = element.parent
+    return tuple(reversed(path))
+
+
 def _label(kind, name, c4_id=""):
     return f'{kind} "{name}"' + (f" (c4Id {c4_id})" if c4_id else "")
 
@@ -203,6 +219,12 @@ def map_diagram(components, relations, problems=None):
         element.tags += [tag for tag in _tags(comp) if tag not in element.tags]
         element_of[comp.id] = element
 
+    # Output order is canonical, not drawing order: identifiers (including the
+    # _2 suffixes for clashes), elements, children, tags and relationships are
+    # all sorted, so shuffling shapes or pages gives byte-identical DSL.
+    # Merging above still runs in drawing order ("first shape wins").
+    unique.sort(key=_path_key)
+
     # explicit ids claim their identifiers first, so they are used verbatim
     used = set()
     for element in unique:
@@ -213,7 +235,8 @@ def map_diagram(components, relations, problems=None):
             element.identifier = _identifier(element.name, used)
 
     model = Model()
-    for element in unique:
+    for element in unique:  # already sorted, so children lists are sorted too
+        element.tags.sort()
         if element.parent is not None:
             element.parent.children.append(element)
         else:
@@ -273,4 +296,10 @@ def map_diagram(components, relations, problems=None):
             rel_by_c4_id.setdefault(relationship.c4_id, relationship)
         relationship.tags += [tag for tag in _tags(rel) if tag not in relationship.tags]
 
+    # Outer relationships first (see above), then a canonical order.
+    depth_of = {element.identifier: depth(element) for element in unique}
+    for relationship in model.relationships:
+        relationship.tags.sort()
+    model.relationships.sort(key=lambda r: (depth_of[r.source] + depth_of[r.target], r.source, r.target,
+                                            r.c4_id, r.description, r.technology))
     return model

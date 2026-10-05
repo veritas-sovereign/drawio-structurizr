@@ -64,7 +64,7 @@ def test_relationships_with_same_description_merge():
     # so these must become one relationship: tags combined, first technology kept
     dsl, problems = convert("relationships-same-description")
     assert dsl.count("customer -> shop") == 1
-    assert 'customer -> shop "Orders" "HTTPS" "Sync,External"' in dsl
+    assert 'customer -> shop "Orders" "HTTPS" "External,Sync"' in dsl  # tags sorted
     assert codes(problems) == ["C4-MERGE-004"]
 
 
