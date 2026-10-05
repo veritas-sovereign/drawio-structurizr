@@ -553,29 +553,29 @@ def relation_problems(components, relations, check_data):
 
     for rel in relations:
         if rel.source not in components:
-            problems.append(f'Relationship "{relation_name(rel)}" has no source element')
+            problems.append(('C4-REL-006', f'Relationship "{relation_name(rel)}" has no source element'))
             continue
         if rel.target not in components:
-            problems.append(f'Relationship "{relation_name(rel)}" has no target element')
+            problems.append(('C4-REL-006', f'Relationship "{relation_name(rel)}" has no target element'))
             continue
         if 'c4Technology' in rel.__dict__:
             if rel.c4Technology=='' and components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                problems.append(f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" has no technology')
+                problems.append(('C4-REL-001', f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" has no technology'))
         if 'c4Description' in rel.__dict__ and check_data:
             m = re.search(r'\((.*)\)', rel.c4Description)
             if m is None:
                 if components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                    problems.append(f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its input data')
+                    problems.append(('C4-REL-002', f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its input data'))
             m = re.search(r'\):(.*)', rel.c4Description)
             if m is None:
                 if components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                    problems.append(f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its return data')
+                    problems.append(('C4-REL-003', f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its return data'))
     return problems
 
 # function that check relations
 def check_relations(components, relations,i,check_data):
-    for problem in relation_problems(components, relations, check_data):
-        print(f'{i}. {problem}')
+    for _, message in relation_problems(components, relations, check_data):
+        print(f'{i}. {message}')
         i = i + 1
     return i
 
@@ -613,20 +613,20 @@ def component_problems(components, relations):
     for comp in components.values():
         if 'c4Description' not in comp.__dict__:
             if comp.c4Type != 'SystemScopeBoundary' and comp.c4Type != 'ContainerScopeBoundary' and comp.c4Type != 'Person':
-                problems.append(f'{comp.c4Type} "{comp.c4Name}" has no description')
+                problems.append(('C4-ELEM-001', f'{comp.c4Type} "{comp.c4Name}" has no description'))
         if 'c4Technology' not in comp.__dict__:
             if(comp.c4Type != 'Software System') and (comp.c4Type != 'Person') and (comp.c4Type != 'SystemScopeBoundary') and (comp.c4Type != 'ContainerScopeBoundary'):
-                problems.append(f'{comp.c4Type} "{comp.c4Name}" has no technology')
+                problems.append(('C4-ELEM-002', f'{comp.c4Type} "{comp.c4Name}" has no technology'))
         
         if comp.c4Type != 'SystemScopeBoundary' and comp.c4Type != 'Person' and comp.c4Type != 'ContainerScopeBoundary':
             if check_inbound_outbound_relations(comp,components,relations) is False:
-                problems.append(f'{comp.c4Type} "{comp.c4Name}" has no incoming or outgoing relationships')
+                problems.append(('C4-ELEM-003', f'{comp.c4Type} "{comp.c4Name}" has no incoming or outgoing relationships'))
     return problems
 
 # function that checks components
 def check_components(components, relations, i):
-    for problem in component_problems(components, relations):
-        print(f'{i}. {problem}')
+    for _, message in component_problems(components, relations):
+        print(f'{i}. {message}')
         i = i + 1
     return i
 
@@ -634,8 +634,56 @@ def _relation_label(rel):
     text = (getattr(rel, 'c4Description', '') or '').replace('\n', ' ').strip()
     return f'"{text}"' if text else f'(id {rel.id})'
 
+# a problem found while reading diagrams; severity is "error" or "warning"
+class Problem:
+    def __init__(self, code, severity, message):
+        self.code = code
+        self.severity = severity
+        self.message = message
+
+    def __str__(self):
+        return f'[{self.code}] {self.severity}: {self.message}'
+
+    def as_dict(self):
+        return {'code': self.code, 'severity': self.severity, 'message': self.message}
+
+    def __eq__(self, other):
+        return isinstance(other, Problem) and self.as_dict() == other.as_dict()
+
+# C4 shape types the converter understands, with the kind of element each one is
+C4_KINDS = {
+    'Person': 'person',
+    'Software System': 'softwareSystem',
+    'SystemScopeBoundary': 'softwareSystem',
+    'Container': 'container',
+    'ContainerScopeBoundary': 'container',
+    'Component': 'component',
+}
+
+def _element_label(comp):
+    name = (getattr(comp, 'c4Name', '') or '').replace('\n', ' ').strip()
+    return f'{comp.c4Type} "{name}"' if name else f'{comp.c4Type} (id {comp.id})'
+
+# shapes must nest the way Structurizr allows: containers in software systems,
+# components in containers, people and software systems at the top level
+def hierarchy_problems(components):
+    problems = []
+    for comp in components.values():
+        kind = C4_KINDS[comp.c4Type]
+        parent = components.get(comp.parent_id)
+        parent_kind = C4_KINDS[parent.c4Type] if parent is not None else None
+        if kind == 'container' and parent_kind != 'softwareSystem':
+            where = f'inside {_element_label(parent)}' if parent is not None else 'outside any software system'
+            problems.append(Problem('C4-HIER-001', 'error', f'{_element_label(comp)} is {where}; draw it inside a software system or system boundary'))
+        elif kind == 'component' and parent_kind != 'container':
+            where = f'inside {_element_label(parent)}' if parent is not None else 'outside any container'
+            problems.append(Problem('C4-HIER-002', 'error', f'{_element_label(comp)} is {where}; draw it inside a container or container boundary'))
+        elif kind in ('person', 'softwareSystem') and parent is not None:
+            problems.append(Problem('C4-HIER-003', 'error', f'{_element_label(comp)} is inside {_element_label(parent)}; people and software systems must be at the top level'))
+    return problems
+
 # load one or more .drawio files, repair arrows and run every check
-# returns (components, relations, problems)
+# returns (components, relations, problems), problems being Problem records
 def load_and_check(filenames, check_data=False):
     components = {}
     relations = []
@@ -647,21 +695,27 @@ def load_and_check(filenames, check_data=False):
         relations += file_relations
         broken_relations += file_broken
 
+    problems = []
+    for comp in list(components.values()):
+        if comp.c4Type not in C4_KINDS:
+            problems.append(Problem('C4-TYPE-001', 'warning', f'{_element_label(comp)} has an unknown c4Type and was skipped'))
+            del components[comp.id]
+
     components = fill_parent_id(components)
     unrepaired = []
     relations = fix_broken_relations(components, relations, broken_relations, unrepaired)
     dropped = []
     relations = fix_missing_relations(components, relations, dropped)
 
-    problems = []
+    problems += hierarchy_problems(components)
     for br in unrepaired:
         if not br.plain:
-            problems.append(f'Relationship {_relation_label(br)} dropped: its arrow is not attached at both ends and could not be repaired')
+            problems.append(Problem('C4-REL-005', 'warning', f'Relationship {_relation_label(br)} dropped: its arrow is not attached at both ends and could not be repaired'))
     for rel in dropped:
         if not getattr(rel, 'plain', False) or rel.source in components or rel.target in components:
-            problems.append(f'Relationship {_relation_label(rel)} dropped: it does not connect two C4 elements')
-    problems += relation_problems(components, relations, check_data)
-    problems += component_problems(components, relations)
+            problems.append(Problem('C4-REL-004', 'warning', f'Relationship {_relation_label(rel)} dropped: it does not connect two C4 elements'))
+    problems += [Problem(code, 'warning', message) for code, message in relation_problems(components, relations, check_data)]
+    problems += [Problem(code, 'warning', message) for code, message in component_problems(components, relations)]
     return components, relations, problems
 
 # main function

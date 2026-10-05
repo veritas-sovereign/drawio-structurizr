@@ -25,7 +25,7 @@ def parse_args(argv):
     cli.add_argument("-d", "--check-data", action="store_true",
                      help="also check that relationships name their input and return data")
     cli.add_argument("--strict", action="store_true",
-                     help="treat problems as errors: do not write the output and exit with code 1")
+                     help="treat warnings as errors too: do not write the output and exit with code 1")
     preview = cli.add_mutually_exclusive_group()
     preview.add_argument("--check", action="store_true",
                          help="only run the checks: write nothing, exit with code 1 if there are problems")
@@ -53,7 +53,9 @@ def write_report(path, inputs, components, relations, problems):
         "elements": len(components),
         "relationships": len(relations),
         "problemCount": len(problems),
-        "problems": [{"number": i, "message": problem} for i, problem in enumerate(problems, 1)],
+        "errorCount": sum(p.severity == "error" for p in problems),
+        "warningCount": sum(p.severity == "warning" for p in problems),
+        "problems": [{"number": i, **problem.as_dict()} for i, problem in enumerate(problems, 1)],
     }
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2, ensure_ascii=False)
@@ -73,6 +75,10 @@ def main(argv=None):
 
     if args.check:
         return 1 if problems else 0
+    errors = [p for p in problems if p.severity == "error"]
+    if errors:
+        print(f"{len(errors)} error(s) found; {args.output} not written", file=sys.stderr)
+        return 1
     if args.strict and problems:
         print(f"{len(problems)} problem(s) found; {args.output} not written (--strict)", file=sys.stderr)
         return 1

@@ -20,6 +20,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Hierarchy checks that stop the output with an error, even without `--strict`: a container outside a software system (`C4-HIER-001`), a component outside a container (`C4-HIER-002`), and a person or software system inside another element (`C4-HIER-003`). Structurizr would reject such output.
+- Every problem has a code and a severity (`error` or `warning`), shown on the terminal and in `--report` (`code`, `severity`, `errorCount`, `warningCount`).
+- Shapes with an unknown `c4Type` are skipped with a warning (`C4-TYPE-001`) instead of becoming software systems.
+- `tests/fixtures/hierarchy/` fixtures.
 - Every page of a `.drawio` file is read. Previously only the first page was, and the rest were silently ignored.
 - Elements that appear on several pages are merged into one; duplicate relationships are merged too.
 - Relationships that are dropped (pointing at a plain shape, or with an arrow that cannot be repaired) are reported.

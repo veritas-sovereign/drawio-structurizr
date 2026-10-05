@@ -69,8 +69,9 @@ def test_legacy_excel_export(name, tmp_path, monkeypatch):
 def test_broken_reports_dropped_relationships():
     problems = parser.load_and_check([str(EXAMPLES / "broken.drawio")], True)[2]
     assert len(problems) == 7
-    assert any('"Export ledger (date): ledger" dropped: it does not connect two C4 elements' in p for p in problems)
-    assert any('"Send invoice (order): invoice" dropped: its arrow is not attached' in p for p in problems)
+    assert all(p.severity == "warning" for p in problems)
+    assert any(p.code == "C4-REL-004" and '"Export ledger (date): ledger" dropped' in p.message for p in problems)
+    assert any(p.code == "C4-REL-005" and '"Send invoice (order): invoice" dropped' in p.message for p in problems)
 
 
 def test_strict_mode_fails_and_writes_nothing(tmp_path):
@@ -137,7 +138,7 @@ def test_report_is_written_as_json(tmp_path):
     data = json.loads(report.read_text())
     assert data["problemCount"] == 7
     assert data["problems"][0]["number"] == 1
-    assert data["elements"] == 4
+    assert data["elements"] == 5
 
 
 def test_outer_relationships_come_first(tmp_path):

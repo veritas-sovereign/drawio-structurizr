@@ -117,7 +117,7 @@ drawio-structurizr <input.drawio>... [-o workspace.dsl] [-n NAME] [-s] [-d] [--s
 | `-n`, `--name` | workspace name (default `Workspace`) |
 | `-s`, `--stats` | print element and relationship counts |
 | `-d`, `--check-data` | also check that relationships name their input and return data |
-| `--strict` | treat any problem as an error: do not write the output, exit with code 1 |
+| `--strict` | treat warnings as errors too: do not write the output, exit with code 1 |
 | `--dry-run` | print the generated DSL to stdout instead of writing it |
 | `--check` | only run the checks: write nothing, exit with code 1 if there are problems (used by the [pre-commit hook](#pre-commit-hook)) |
 | `--diff` | print a unified diff between the existing output file and the newly generated DSL, without writing |
@@ -126,7 +126,7 @@ drawio-structurizr <input.drawio>... [-o workspace.dsl] [-n NAME] [-s] [-d] [--s
 | `--export-dir DIR` | folder for exported files (default: next to the output file) |
 | `--report FILE` | write the problems and element and relationship counts as JSON |
 
-The [checks](#checks) always run. Problems are printed to stderr as a numbered list, and the file is still written unless `--strict` is set.
+The [checks](#checks) always run. Problems are printed to stderr as a numbered list, each with a code and a severity, for example `[C4-HIER-001] error: …`. **Errors** always stop the output, because Structurizr would reject it; **warnings** stop it only with `--strict`.
 
 Example:
 
@@ -154,7 +154,11 @@ drawio-structurizr model.drawio --check -d --report report.json
   "elements": 4,
   "relationships": 2,
   "problemCount": 1,
-  "problems": [{ "number": 1, "message": "Container \"Web App\" has no technology" }]
+  "errorCount": 0,
+  "warningCount": 1,
+  "problems": [
+    { "number": 1, "code": "C4-ELEM-002", "severity": "warning", "message": "Container \"Web App\" has no technology" }
+  ]
 }
 ```
 
@@ -408,14 +412,22 @@ Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends a
 
 ### Checks
 
-| Check | Applies to |
-| --- | --- |
-| Description is filled in | elements, except people and boundaries |
-| Technology is filled in | containers and components; relationships not involving a person |
-| Input data `( … )` and return data `): …` are named | relationships not involving a person (with `-d`) |
-| Has at least one relationship, directly or through a parent | elements, except people and boundaries |
-| Arrow is attached at both ends, or can be repaired | C4 relationships; others are dropped and reported |
-| Both ends are C4 elements | relationships; a relationship to a plain shape is dropped and reported |
+| Code | Severity | Check | Applies to |
+| --- | --- | --- | --- |
+| `C4-HIER-001` | error | A container is drawn inside a software system or system boundary | containers |
+| `C4-HIER-002` | error | A component is drawn inside a container or container boundary | components |
+| `C4-HIER-003` | error | People and software systems are not drawn inside another element | people, software systems, system boundaries |
+| `C4-TYPE-001` | warning | The `c4Type` is one the tool knows; other shapes are skipped | all C4 shapes |
+| `C4-ELEM-001` | warning | Description is filled in | elements, except people and boundaries |
+| `C4-ELEM-002` | warning | Technology is filled in | containers and components |
+| `C4-ELEM-003` | warning | Has at least one relationship, directly or through a parent | elements, except people and boundaries |
+| `C4-REL-001` | warning | Technology is filled in | relationships not involving a person |
+| `C4-REL-002` | warning | Input data `( … )` is named | relationships not involving a person (with `-d`) |
+| `C4-REL-003` | warning | Return data `): …` is named | relationships not involving a person (with `-d`) |
+| `C4-REL-004` | warning | Both ends are C4 elements; otherwise the relationship is dropped | relationships |
+| `C4-REL-005` | warning | Arrow is attached at both ends or can be repaired; otherwise it is dropped | C4 relationships |
+
+Errors mean Structurizr would reject the output, so nothing is written. The known `c4Type` values are `Person`, `Software System`, `Container`, `Component`, `SystemScopeBoundary` and `ContainerScopeBoundary`.
 
 ## Limitations
 
@@ -423,7 +435,6 @@ Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends a
 - **Only C4 properties are read.** Shapes without a `c4Type` are skipped. Diagrams drawn from another template need their shapes updated first (see [Using shapes from other libraries](#using-shapes-from-other-libraries)), or the tool extended: `parser.py` to read the extra shapes and `mapper.py` to map them.
 - **Nesting is based on position.** A shape must sit fully inside its parent's box on the same page.
 - **Merging is by name.** Two different elements with the same type and name are merged into one. Rename one of them.
-- **Containers must sit inside a software system.** Structurizr requires this. A container drawn on its own produces DSL that `--validate` rejects; the tool does not warn about it.
 - **structurizr-cli is archived upstream.** See [the note above](#is-it-free); Docker keeps `--validate` working.
 - **Two DSL exporters.** `python -m drawio_structurizr.parser` still writes `workspace.dsl` with its older exporter. Prefer the `drawio-structurizr` command, whose output this README describes.
 
@@ -434,7 +445,7 @@ Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends a
 | [`shop.drawio`](examples/shop.drawio) | A clean diagram that passes every check |
 | [`shop-compressed.drawio`](examples/shop-compressed.drawio) | The same diagram in compressed format |
 | [`multipage.drawio`](examples/multipage.drawio) | A context page and a container page, merged into one workspace; uses `c4Id` and `c4Tags` |
-| [`broken.drawio`](examples/broken.drawio) | Seven reported problems and one repaired arrow |
+| [`broken.drawio`](examples/broken.drawio) | Seven warnings and one repaired arrow; still produces valid DSL |
 
 ## Testing
 
