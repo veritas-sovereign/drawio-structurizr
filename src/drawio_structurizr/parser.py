@@ -12,6 +12,8 @@ import sys, getopt
 # xls
 import xlsxwriter
 
+from .problems import Problem
+
 def js_encode_uri_component(data):
     return quote(data, safe='~()*!.\'')
 
@@ -633,22 +635,6 @@ def check_components(components, relations, i):
 def _relation_label(rel):
     text = (getattr(rel, 'c4Description', '') or '').replace('\n', ' ').strip()
     return f'"{text}"' if text else f'(id {rel.id})'
-
-# a problem found while reading diagrams; severity is "error" or "warning"
-class Problem:
-    def __init__(self, code, severity, message):
-        self.code = code
-        self.severity = severity
-        self.message = message
-
-    def __str__(self):
-        return f'[{self.code}] {self.severity}: {self.message}'
-
-    def as_dict(self):
-        return {'code': self.code, 'severity': self.severity, 'message': self.message}
-
-    def __eq__(self, other):
-        return isinstance(other, Problem) and self.as_dict() == other.as_dict()
 
 # C4 shape types the converter understands, with the kind of element each one is
 C4_KINDS = {

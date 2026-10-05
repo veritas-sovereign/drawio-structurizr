@@ -382,7 +382,7 @@ In draw.io, open **More Shapes**, enable **C4**, and build the diagram from thos
 | Relationship | `->` |
 
 - **Nesting comes from position.** A shape drawn inside another shape's box on the same page becomes its child. If it sits inside several boxes, the smallest one is its parent.
-- **The same element on several pages is merged.** Shapes with the same type and name (ignoring case) become one element; a boundary and a software system with the same name count as the same type. Containers and components merge only when their parents also match, so two containers called "API" in different systems stay separate. The first shape found supplies the description and technology; later ones only fill gaps.
+- **The same element on several pages or files is merged.** See [Merging](#merging).
 - **Attach every arrow** to a shape at both ends. Arrows that only touch a shape are repaired where possible.
 - **Relationship descriptions** name the data passed in each direction:
 
@@ -400,10 +400,33 @@ Add these with **Edit Data** on any C4 shape or relationship:
 
 | Property | On | Effect |
 | --- | --- | --- |
-| `c4Id` | elements | used as the DSL identifier instead of one made from the name, so renaming the element does not change it. Characters other than letters, digits, `_` and `-` become `_`. |
+| `c4Id` | elements and relationships | identifies the element or relationship when merging (see [Merging](#merging)). On elements it is also the DSL identifier instead of one made from the name, so renaming the element does not change it. Characters other than letters, digits, `_` and `-` become `_`. |
 | `c4Tags` | elements and relationships | comma-separated [tags](https://docs.structurizr.com/dsl/language#tags), for styles and filtered views. Tags from merged shapes are combined. |
 
-`c4Id` does not affect merging, which is always by type and name.
+### Merging
+
+When the same element or relationship is drawn more than once (on several pages or in several files), it appears once in the workspace.
+
+**Elements** are the same when:
+
+1. both shapes have a `c4Id` and the `c4Id`s match, whatever their names; or
+2. otherwise, their kind, name and parent match. Names are compared ignoring case and surrounding spaces. A boundary and a software system count as the same kind. Parents are compared after merging, so two containers called "API" in different systems stay separate. If only one of the shapes has a `c4Id`, the element takes it.
+
+The first shape found supplies the name, description and technology; later shapes fill gaps. Tags are combined.
+
+**Relationships** are the same when they have the same `c4Id`, or the same source, target and description. That is how Structurizr identifies relationships, so two arrows between the same elements with the same description always become one, even if their technologies or tags differ. Tags are combined and the first technology is kept.
+
+Conflicts are reported:
+
+| Code | Severity | Meaning |
+| --- | --- | --- |
+| `C4-IDENT-001` | error | one `c4Id` is used for elements of different kinds |
+| `C4-IDENT-002` | warning | an element with a `c4Id` is drawn inside different parents; the first parent is kept |
+| `C4-MERGE-001` | error | two elements (or relationships) would collide but have different `c4Id`s; Structurizr rejects duplicate names |
+| `C4-MERGE-002` | warning | different descriptions for one element; the first is kept |
+| `C4-MERGE-003` | warning | different technologies for one element; the first is kept |
+| `C4-MERGE-004` | warning | different technologies for one relationship; the first is kept |
+| `C4-MERGE-005` | warning | different names for one `c4Id`; the first is kept |
 
 ### Using shapes from other libraries
 
@@ -441,6 +464,7 @@ Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends a
 | `C4-REL-003` | warning | Return data `): …` is named | relationships not involving a person (with `-d`) |
 | `C4-REL-004` | warning | Both ends are C4 elements; otherwise the relationship is dropped | relationships |
 | `C4-REL-005` | warning | Arrow is attached at both ends or can be repaired; otherwise it is dropped | C4 relationships |
+| `C4-IDENT-*`, `C4-MERGE-*` | error or warning | Conflicts found while merging; see [Merging](#merging) | elements and relationships drawn more than once |
 
 Errors mean Structurizr would reject the output, so nothing is written. The known `c4Type` values are `Person`, `Software System`, `Container`, `Component`, `SystemScopeBoundary` and `ContainerScopeBoundary`.
 
@@ -449,7 +473,7 @@ Errors mean Structurizr would reject the output, so nothing is written. The know
 - **Layout is not preserved.** Structurizr DSL describes the model, not positions, and the generated views use `autoLayout`. Element placement from draw.io does not carry over; only elements, nesting and relationships do. You can arrange the views again in Structurizr after import. Views use Structurizr's default styling; no theme is set, so validation needs no network access.
 - **Only C4 properties are read.** Shapes without a `c4Type` are skipped. Diagrams drawn from another template need their shapes updated first (see [Using shapes from other libraries](#using-shapes-from-other-libraries)), or the tool extended: `parser.py` to read the extra shapes and `mapper.py` to map them.
 - **Nesting is based on position.** A shape must sit fully inside its parent's box on the same page.
-- **Merging is by name.** Two different elements with the same type and name are merged into one. Rename one of them.
+- **Merging is by name unless you use `c4Id`.** Two different elements with the same kind, name and parent are merged into one. Give them different names, or different `c4Id`s (which then reports `C4-MERGE-001`, because Structurizr does not allow the duplicate name either).
 - **structurizr-cli is archived upstream.** See [the note above](#is-it-free); Docker keeps `--validate` working.
 - **Two DSL exporters.** `python -m drawio_structurizr.parser` still writes `workspace.dsl` with its older exporter. Prefer the `drawio-structurizr` command, whose output this README describes.
 
@@ -480,7 +504,8 @@ drawio-structurizr/
 │       ├── __init__.py          package version
 │       ├── main.py              drawio-structurizr command
 │       ├── parser.py            reads .drawio files, runs checks, exports Excel and legacy DSL
-│       ├── mapper.py            maps C4 shapes to Structurizr DSL constructs
+│       ├── mapper.py            maps C4 shapes to Structurizr DSL constructs and merges duplicates
+│       ├── problems.py          the coded error and warning records
 │       ├── emitter.py           writes a .dsl file from the mapped model
 │       ├── validate.py          optional structurizr-cli validation
 │       └── dump.py              prints the cell values of a diagram
@@ -491,9 +516,17 @@ drawio-structurizr/
 │   ├── multipage.drawio         two pages merged into one workspace
 │   └── broken.drawio            sample with deliberate mistakes
 ├── tests/
+│   ├── fixtures/
+│   │   ├── hierarchy/           diagrams that break the C4 nesting rules
+│   │   ├── identity/            elements and relationships drawn more than once
+│   │   └── views/               diagrams for System Context view generation
 │   ├── test_examples.py         end-to-end tests on the samples
 │   ├── test_emitter.py          mapper and emitter unit tests
-│   └── test_validate.py         choice of local CLI, Docker or skip
+│   ├── test_hierarchy.py        nesting errors and unknown shape types
+│   ├── test_identity.py         merging and merge conflicts
+│   ├── test_validate.py         choice of local CLI, Docker or skip
+│   ├── test_validate_required.py  --validate-required
+│   └── test_views.py            System Context views
 ├── .github/
 │   ├── dependabot.yml           weekly updates for the base image digest and GitHub Actions
 │   └── workflows/

@@ -7,6 +7,8 @@ returned by ``parser.load_from_xml``. The emitter consumes this model.
 import re
 from dataclasses import dataclass, field
 
+from .problems import Problem
+
 # draw.io C4 shape type -> Structurizr DSL keyword
 C4_TO_DSL = {
     "Person": "person",
@@ -39,6 +41,7 @@ class ModelRelationship:
     description: str = ""
     technology: str = ""
     tags: list = field(default_factory=list)
+    c4_id: str = ""
 
 
 @dataclass
@@ -86,43 +89,115 @@ def _is_ancestor(element, candidate):
     return False
 
 
-def map_diagram(components, relations):
+def _normalise(name):
+    return name.strip().casefold()
+
+
+def _label(kind, name, c4_id=""):
+    return f'{kind} "{name}"' + (f" (c4Id {c4_id})" if c4_id else "")
+
+
+def map_diagram(components, relations, problems=None):
     """Map parsed draw.io components and relations to a ``Model``.
 
-    Shapes with the same DSL kind and name (case-insensitive) are merged into one
-    element, so an element drawn on several pages or files appears once.
-    Containers and components merge only when their parents also have the same
-    kind and name. The first shape seen supplies each attribute, later ones only
-    fill in what is still empty, and tags are combined.
+    Elements drawn more than once (on several pages or in several files) are
+    merged into one:
 
-    A ``c4Id`` property, when present, becomes the DSL identifier (characters
-    that are not allowed are replaced); otherwise the identifier comes from the
-    name.
+    * Two shapes with a ``c4Id`` are the same element when their ``c4Id``s
+      match, whatever their names.
+    * Otherwise shapes are the same when kind, normalised name
+      (``strip().casefold()``) and resolved parent all match. A shape with a
+      ``c4Id`` merges this way with shapes without one, and the element takes
+      the ``c4Id``.
+
+    The first shape seen supplies name, description and technology; later
+    shapes fill gaps, and differences are reported as warnings. Tags are
+    combined. Conflicts that Structurizr would reject are reported as errors.
+
+    Relationships are the same when they have the same ``c4Id``, or the same
+    source, target and description (which is how Structurizr identifies them).
+
+    A ``c4Id`` becomes the DSL identifier (characters that are not allowed are
+    replaced); otherwise the identifier comes from the name. Problems found
+    while merging are appended to ``problems`` when a list is given.
     """
-    by_key = {}
-    element_of = {}  # draw.io id -> ModelElement
-    unique = []
+    if problems is None:
+        problems = []
+
+    def add(code, severity, message):
+        problems.append(Problem(code, severity, message))
 
     def kind_and_name(comp):
         c4_type = getattr(comp, "c4Type", None) or "Software System"
         return C4_TO_DSL.get(c4_type, "softwareSystem"), _clean(getattr(comp, "c4Name", "")) or c4_type
 
-    for comp in components.values():
-        kind, name = kind_and_name(comp)
-        key = (kind, name.lower())
-        parent = components.get(getattr(comp, "parent_id", None))
-        if kind in ("container", "component") and parent is not None:
-            parent_kind, parent_name = kind_and_name(parent)
-            key += (parent_kind, parent_name.lower())
+    def raw_depth(comp):
+        depth, seen = 0, set()
+        while getattr(comp, "parent_id", None) in components and comp.id not in seen:
+            seen.add(comp.id)
+            comp, depth = components[comp.parent_id], depth + 1
+        return depth
 
-        element = by_key.get(key)
+    by_name = {}   # (id of resolved parent, kind, normalised name) -> ModelElement
+    by_c4_id = {}  # c4Id -> ModelElement
+    element_of = {}  # draw.io id -> ModelElement
+    unique = []
+
+    # parents first, so each shape's parent is already resolved
+    for comp in sorted(components.values(), key=raw_depth):
+        kind, name = kind_and_name(comp)
+        c4_id = _clean(getattr(comp, "c4Id", ""))
+        description = _clean(getattr(comp, "c4Description", ""))
+        technology = _clean(getattr(comp, "c4Technology", ""))
+        parent = element_of.get(getattr(comp, "parent_id", None))
+        name_key = (id(parent), kind, _normalise(name))
+
+        element = None
+        if c4_id and c4_id in by_c4_id:
+            element = by_c4_id[c4_id]
+            if element.kind != kind:
+                add("C4-IDENT-001", "error",
+                    f"c4Id {c4_id} is used by {_label(element.kind, element.name)} and by {_label(kind, name)}; "
+                    "one c4Id cannot name elements of different kinds")
+                element = None
+            else:
+                if _normalise(element.name) != _normalise(name):
+                    add("C4-MERGE-005", "warning",
+                        f'{_label(kind, element.name, c4_id)} is also drawn as "{name}"; kept "{element.name}"')
+                if parent is not None and element.parent is not None and parent is not element.parent:
+                    add("C4-IDENT-002", "warning",
+                        f"{_label(kind, element.name, c4_id)} is drawn inside {_label(element.parent.kind, element.parent.name)} "
+                        f'and inside {_label(parent.kind, parent.name)}; kept "{element.parent.name}"')
+        elif name_key in by_name:
+            candidate = by_name[name_key]
+            if c4_id and candidate.c4_id and candidate.c4_id != c4_id:
+                add("C4-MERGE-001", "error",
+                    f"{_label(kind, name)} is drawn twice with different c4Ids ({candidate.c4_id} and {c4_id}); "
+                    "Structurizr does not allow two elements with the same name here. Use one c4Id or rename one")
+            else:
+                element = candidate
+
         if element is None:
-            element = ModelElement(id=comp.id, identifier="", kind=kind, name=name)
-            by_key[key] = element
+            element = ModelElement(id=comp.id, identifier="", kind=kind, name=name,
+                                   description=description, technology=technology, parent=parent)
             unique.append(element)
-        element.description = element.description or _clean(getattr(comp, "c4Description", ""))
-        element.technology = element.technology or _clean(getattr(comp, "c4Technology", ""))
-        element.c4_id = element.c4_id or _clean(getattr(comp, "c4Id", ""))
+            by_name.setdefault(name_key, element)
+        else:
+            if description and element.description and description != element.description:
+                add("C4-MERGE-002", "warning",
+                    f'{_label(kind, element.name)} has different descriptions; kept "{element.description}", saw "{description}"')
+            if technology and element.technology and technology != element.technology:
+                add("C4-MERGE-003", "warning",
+                    f'{_label(kind, element.name)} has different technologies; kept "{element.technology}", saw "{technology}"')
+            element.description = element.description or description
+            element.technology = element.technology or technology
+            if element.parent is None and parent is not None and not _is_ancestor(element, parent):
+                element.parent = parent
+
+        if c4_id and not element.c4_id:
+            element.c4_id = c4_id
+        if element.c4_id:
+            by_c4_id.setdefault(element.c4_id, element)
         element.tags += [tag for tag in _tags(comp) if tag not in element.tags]
         element_of[comp.id] = element
 
@@ -134,12 +209,6 @@ def map_diagram(components, relations):
     for element in unique:
         if not element.c4_id:
             element.identifier = _identifier(element.name, used)
-
-    for comp in components.values():
-        element = element_of[comp.id]
-        parent = element_of.get(getattr(comp, "parent_id", None))
-        if parent is not None and element.parent is None and not _is_ancestor(element, parent):
-            element.parent = parent
 
     model = Model()
     for element in unique:
@@ -164,18 +233,37 @@ def map_diagram(components, relations):
             resolved.append((depth(source) + depth(target), rel, source, target))
     resolved.sort(key=lambda item: item[0])
 
-    seen = set()
+    by_signature = {}  # (source, target, description) -> ModelRelationship
+    rel_by_c4_id = {}
     for _, rel, source, target in resolved:
-        relationship = ModelRelationship(
-            source=source.identifier,
-            target=target.identifier,
-            description=_clean(getattr(rel, "c4Description", "")),
-            technology=_clean(getattr(rel, "c4Technology", "")),
-            tags=_tags(rel),
-        )
-        signature = (relationship.source, relationship.target, relationship.description, relationship.technology)
-        if signature not in seen:
-            seen.add(signature)
+        description = _clean(getattr(rel, "c4Description", ""))
+        technology = _clean(getattr(rel, "c4Technology", ""))
+        c4_id = _clean(getattr(rel, "c4Id", ""))
+        signature = (source.identifier, target.identifier, description)
+        label = f'Relationship "{description or "Uses"}" from {_label(source.kind, source.name)} to {_label(target.kind, target.name)}'
+
+        relationship = rel_by_c4_id.get(c4_id) if c4_id else None
+        if relationship is None and signature in by_signature:
+            relationship = by_signature[signature]
+            if c4_id and relationship.c4_id and relationship.c4_id != c4_id:
+                add("C4-MERGE-001", "error",
+                    f"{label} is drawn twice with different c4Ids ({relationship.c4_id} and {c4_id}); "
+                    "Structurizr does not allow two relationships with the same source, target and description")
+                continue
+
+        if relationship is None:
+            relationship = ModelRelationship(source=source.identifier, target=target.identifier,
+                                             description=description, technology=technology, c4_id=c4_id)
             model.relationships.append(relationship)
+            by_signature.setdefault(signature, relationship)
+        else:
+            if technology and relationship.technology and technology != relationship.technology:
+                add("C4-MERGE-004", "warning",
+                    f'{label} has different technologies; kept "{relationship.technology}", saw "{technology}"')
+            relationship.technology = relationship.technology or technology
+            relationship.c4_id = relationship.c4_id or c4_id
+        if relationship.c4_id:
+            rel_by_c4_id.setdefault(relationship.c4_id, relationship)
+        relationship.tags += [tag for tag in _tags(rel) if tag not in relationship.tags]
 
     return model

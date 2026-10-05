@@ -93,6 +93,7 @@ def main(argv=None):
         args.validate = True
 
     components, relations, problems = parser.load_and_check(args.inputs, args.check_data)
+    model = map_diagram(components, relations, problems)  # adds merge problems
     if args.stats:
         print(f"Number of components: {len(components)}", file=sys.stderr)
         print(f"Number of relations: {len(relations)}", file=sys.stderr)
@@ -110,7 +111,7 @@ def main(argv=None):
         print(f"{len(problems)} problem(s) found; {args.output} not written (--strict)", file=sys.stderr)
         return 1
 
-    dsl = emit(map_diagram(components, relations), args.name, not args.no_context_views)
+    dsl = emit(model, args.name, not args.no_context_views)
 
     if args.dry_run:
         sys.stdout.write(dsl)

@@ -1,0 +1,35 @@
+<mxfile host="drawio">
+  <diagram id="p1" name="Page 1">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <object placeholders="1" c4Type="SystemScopeBoundary" c4Name="Shop" label="%c4Name%" id="sys">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="20" y="20" width="700" height="400" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Container" c4Name="API" c4Description="Serves" c4Technology="Go" c4Id="core" label="%c4Name%" id="api">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="60" y="60" width="600" height="300" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Component" c4Name="Order Service" c4Description="Orders" c4Technology="Go" c4Id="core" label="%c4Name%" id="svc">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="100" y="120" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Person" c4Name="Customer" label="%c4Name%" id="user">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="800" y="40" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Relationship" c4Description="Orders" c4Technology="HTTPS" label="%c4Description%" id="r">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="user" target="svc">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -7,6 +7,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- Relationships between the same elements with the same description but different technologies were both emitted, which Structurizr rejects. They are now merged (Structurizr identifies relationships by source, target and description), keeping the first technology and combining tags.
+- Element names are compared with `strip().casefold()` instead of `lower()`.
 - Merged workspaces could fail Structurizr validation with "relationship already exists": a nested relationship implies one between the parents, which then clashed with an explicit one defined later. Outer relationships are now written first.
 
 ### Changed
@@ -24,6 +26,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Every problem has a code and a severity (`error` or `warning`), shown on the terminal and in `--report` (`code`, `severity`, `errorCount`, `warningCount`).
 - Shapes with an unknown `c4Type` are skipped with a warning (`C4-TYPE-001`) instead of becoming software systems.
 - `tests/fixtures/hierarchy/` fixtures.
+- Merging uses `c4Id` when both shapes have one, so an element can be renamed on one page without splitting it; a `c4Id` on only one shape is adopted. Relationships can carry a `c4Id` too.
+- Merge conflicts are reported: `C4-IDENT-001` (one `c4Id` on different kinds, error), `C4-IDENT-002` (different parents), `C4-MERGE-001` (same name, different `c4Id`s, error), `C4-MERGE-002`/`003` (different description/technology), `C4-MERGE-004` (different relationship technology), `C4-MERGE-005` (different names for one `c4Id`). They appear in `--report` and count for `--strict` and `--check`.
 - A `systemContext` view for each top-level software system with a relationship crossing its boundary (directly or through its containers and components), keyed `<identifier>-context`. `--no-context-views` turns them off.
 - `--validate-required`: like `--validate`, but fails before writing anything when no validator is available, listing what was checked (structurizr-cli on `PATH`, Docker installed and running).
 - Every page of a `.drawio` file is read. Previously only the first page was, and the rest were silently ignored.
