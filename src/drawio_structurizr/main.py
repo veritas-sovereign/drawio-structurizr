@@ -41,6 +41,8 @@ def parse_args(argv):
                      help="also export the workspace with structurizr-cli; repeatable. "
                           "One of: " + ", ".join(EXPORT_FORMATS))
     cli.add_argument("--export-dir", help="folder for exported files (default: next to the output file)")
+    cli.add_argument("--no-context-views", action="store_true",
+                     help="do not add a System Context view for each top-level software system")
     cli.add_argument("--report", metavar="FILE", help="write the checks and statistics as JSON to FILE")
     args = cli.parse_args(argv)
     if args.validate_required and (args.check or args.dry_run or args.diff):
@@ -108,7 +110,7 @@ def main(argv=None):
         print(f"{len(problems)} problem(s) found; {args.output} not written (--strict)", file=sys.stderr)
         return 1
 
-    dsl = emit(map_diagram(components, relations), args.name)
+    dsl = emit(map_diagram(components, relations), args.name, not args.no_context_views)
 
     if args.dry_run:
         sys.stdout.write(dsl)

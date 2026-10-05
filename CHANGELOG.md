@@ -24,6 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Every problem has a code and a severity (`error` or `warning`), shown on the terminal and in `--report` (`code`, `severity`, `errorCount`, `warningCount`).
 - Shapes with an unknown `c4Type` are skipped with a warning (`C4-TYPE-001`) instead of becoming software systems.
 - `tests/fixtures/hierarchy/` fixtures.
+- A `systemContext` view for each top-level software system with a relationship crossing its boundary (directly or through its containers and components), keyed `<identifier>-context`. `--no-context-views` turns them off.
 - `--validate-required`: like `--validate`, but fails before writing anything when no validator is available, listing what was checked (structurizr-cli on `PATH`, Docker installed and running).
 - Every page of a `.drawio` file is read. Previously only the first page was, and the rest were silently ignored.
 - Elements that appear on several pages are merged into one; duplicate relationships are merged too.
