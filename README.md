@@ -35,7 +35,7 @@
 - **converts** them to a [Structurizr DSL](https://docs.structurizr.com/dsl) workspace, with system landscape, container and component views
 - **exports** elements and relationships to an Excel workbook
 
-Both compressed and uncompressed `.drawio` files are supported, and every page of a file is read. An element drawn on several pages (for example a context page and a container page) appears once in the workspace.
+Both compressed and uncompressed `.drawio` files are supported, and every page of a file is read. Several files can be converted into one workspace. An element drawn on several pages or files (for example a context page and a container page) appears once.
 
 ## Quick Start
 
@@ -104,17 +104,19 @@ The project provides three commands. Run them from any directory once the packag
 ### Convert to Structurizr DSL
 
 ```bash
-drawio-structurizr <input.drawio> [-o workspace.dsl] [-n NAME] [-s] [-d] [--strict] [--validate]
+drawio-structurizr <input.drawio>... [-o workspace.dsl] [-n NAME] [-s] [-d] [--strict] [--dry-run | --diff] [--validate]
 ```
 
 | Option | Meaning |
 | --- | --- |
-| `input` | draw.io file to convert (all pages are read) |
+| `input` | one or more draw.io files; all pages of all files are merged into one workspace |
 | `-o`, `--output` | output DSL file (default `workspace.dsl`) |
 | `-n`, `--name` | workspace name (default `Workspace`) |
 | `-s`, `--stats` | print element and relationship counts |
 | `-d`, `--check-data` | also check that relationships name their input and return data |
 | `--strict` | treat any problem as an error: do not write the output, exit with code 1 |
+| `--dry-run` | print the generated DSL to stdout instead of writing it |
+| `--diff` | print a unified diff between the existing output file and the newly generated DSL, without writing |
 | `--validate` | check the output with structurizr-cli, if it is on `PATH` |
 
 The [checks](#checks) always run. Problems are printed to stderr as a numbered list, and the file is still written unless `--strict` is set.
@@ -124,7 +126,11 @@ Example:
 ```bash
 drawio-structurizr examples/shop.drawio -o shop.dsl -n "Online Shop" -s --validate
 drawio-structurizr examples/broken.drawio -d --strict      # 7 problems, exit code 1, nothing written
+drawio-structurizr context.drawio containers.drawio -o workspace.dsl   # merge several files
+drawio-structurizr examples/shop.drawio -o shop.dsl --diff   # review changes before overwriting
 ```
+
+Problems, statistics and the "Wrote" line never go to stdout with `--dry-run` or `--diff`, so their output can be redirected to a file or piped.
 
 ### Validate and export to Excel
 
@@ -158,9 +164,11 @@ Prints the raw cell values of an uncompressed diagram. Useful for debugging.
 ### Typical workflow
 
 1. Draw the diagram in draw.io with the C4 shapes (see [Diagram conventions](#diagram-conventions)).
-2. Generate the workspace with every check enforced, and fix what it reports until it succeeds:
+2. Review what would change:
+   `drawio-structurizr model.drawio -o workspace.dsl --diff`
+3. Generate the workspace with every check enforced, and fix what it reports until it succeeds:
    `drawio-structurizr model.drawio -o workspace.dsl -d --strict --validate`
-3. In the repository that holds your architecture, commit the `.drawio` file and the generated `workspace.dsl` together.
+4. In the repository that holds your architecture, commit the `.drawio` file and the generated `workspace.dsl` together.
 
 ## Validating with structurizr-cli
 
@@ -269,6 +277,17 @@ In draw.io, open **More Shapes**, enable **C4**, and build the diagram from thos
 
   This format is only checked when you pass `-d` to the parser, and only produces warnings. Conversion to DSL works with any description.
 
+### Optional properties
+
+Add these with **Edit Data** on any C4 shape or relationship:
+
+| Property | On | Effect |
+| --- | --- | --- |
+| `c4Id` | elements | used as the DSL identifier instead of one made from the name, so renaming the element does not change it. Characters other than letters, digits, `_` and `-` become `_`. |
+| `c4Tags` | elements and relationships | comma-separated [tags](https://docs.structurizr.com/dsl/language#tags), for styles and filtered views. Tags from merged shapes are combined. |
+
+`c4Id` does not affect merging, which is always by type and name.
+
 ### Using shapes from other libraries
 
 The tool reads a shape only if it has a `c4Type` property. Shapes from other libraries (AWS, Azure, Kubernetes, plain boxes) have none and are skipped. You can add the properties to any shape:
@@ -316,7 +335,7 @@ Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends a
 | --- | --- |
 | [`shop.drawio`](examples/shop.drawio) | A clean diagram that passes every check |
 | [`shop-compressed.drawio`](examples/shop-compressed.drawio) | The same diagram in compressed format |
-| [`multipage.drawio`](examples/multipage.drawio) | A context page and a container page, merged into one workspace |
+| [`multipage.drawio`](examples/multipage.drawio) | A context page and a container page, merged into one workspace; uses `c4Id` and `c4Tags` |
 | [`broken.drawio`](examples/broken.drawio) | Seven reported problems and one repaired arrow |
 
 ## Testing

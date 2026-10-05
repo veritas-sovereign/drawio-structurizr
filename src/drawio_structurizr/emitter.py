@@ -14,6 +14,8 @@ def _emit_element(element: ModelElement, depth, lines):
     args = [_quote(element.name), _quote(element.description)]
     if element.kind in ("container", "component"):
         args.append(_quote(element.technology))
+    if element.tags:
+        args.append(_quote(",".join(element.tags)))
     header = f"{pad}{element.identifier} = {element.kind} {' '.join(args)}"
     if element.children:
         lines.append(header + " {")
@@ -59,8 +61,10 @@ def emit(model: Model, name="Workspace"):
         lines.append("")
     for rel in model.relationships:
         args = [_quote(rel.description or "Uses")]
-        if rel.technology:
+        if rel.technology or rel.tags:
             args.append(_quote(rel.technology))
+        if rel.tags:
+            args.append(_quote(",".join(rel.tags)))
         lines.append(f"{INDENT * 2}{rel.source} -> {rel.target} {' '.join(args)}")
     lines += [f"{INDENT}}}", "", f"{INDENT}views {{", *_views(model), f"{INDENT}}}", "}"]
     return "\n".join(lines) + "\n"

@@ -26,6 +26,8 @@ class ModelElement:
     name: str
     description: str = ""
     technology: str = ""
+    tags: list = field(default_factory=list)
+    c4_id: str = ""
     children: list = field(default_factory=list)
     parent: "ModelElement" = field(default=None, repr=False, compare=False)
 
@@ -36,6 +38,7 @@ class ModelRelationship:
     target: str
     description: str = ""
     technology: str = ""
+    tags: list = field(default_factory=list)
 
 
 @dataclass
@@ -48,16 +51,31 @@ def _clean(text):
     return (text or "").replace("\n", " ").strip()
 
 
-def _identifier(name, used):
-    base = re.sub(r"\W+", "_", name).strip("_").lower() or "element"
-    if base[0].isdigit():
-        base = "e_" + base
+def _tags(obj):
+    return [tag.strip() for tag in _clean(getattr(obj, "c4Tags", "")).split(",") if tag.strip()]
+
+
+def _unique(base, used):
     candidate, n = base, 1
     while candidate in used:
         n += 1
         candidate = f"{base}_{n}"
     used.add(candidate)
     return candidate
+
+
+def _identifier(name, used):
+    base = re.sub(r"\W+", "_", name).strip("_").lower() or "element"
+    if base[0].isdigit():
+        base = "e_" + base
+    return _unique(base, used)
+
+
+def _explicit_identifier(c4_id, used):
+    base = re.sub(r"[^\w-]+", "_", c4_id).strip("_") or "element"
+    if base[0].isdigit():
+        base = "e_" + base
+    return _unique(base, used)
 
 
 def _is_ancestor(element, candidate):
@@ -72,11 +90,15 @@ def map_diagram(components, relations):
     """Map parsed draw.io components and relations to a ``Model``.
 
     Shapes with the same DSL kind and name (case-insensitive) are merged into one
-    element, so an element drawn on several pages appears once. Containers and
-    components merge only when their parents also have the same kind and name. The first shape
-    seen supplies each attribute; later ones only fill in what is still empty.
+    element, so an element drawn on several pages or files appears once.
+    Containers and components merge only when their parents also have the same
+    kind and name. The first shape seen supplies each attribute, later ones only
+    fill in what is still empty, and tags are combined.
+
+    A ``c4Id`` property, when present, becomes the DSL identifier (characters
+    that are not allowed are replaced); otherwise the identifier comes from the
+    name.
     """
-    used = set()
     by_key = {}
     element_of = {}  # draw.io id -> ModelElement
     unique = []
@@ -87,8 +109,6 @@ def map_diagram(components, relations):
 
     for comp in components.values():
         kind, name = kind_and_name(comp)
-        description = _clean(getattr(comp, "c4Description", ""))
-        technology = _clean(getattr(comp, "c4Technology", ""))
         key = (kind, name.lower())
         parent = components.get(getattr(comp, "parent_id", None))
         if kind in ("container", "component") and parent is not None:
@@ -97,20 +117,23 @@ def map_diagram(components, relations):
 
         element = by_key.get(key)
         if element is None:
-            element = ModelElement(
-                id=comp.id,
-                identifier=_identifier(name, used),
-                kind=kind,
-                name=name,
-                description=description,
-                technology=technology,
-            )
+            element = ModelElement(id=comp.id, identifier="", kind=kind, name=name)
             by_key[key] = element
             unique.append(element)
-        else:
-            element.description = element.description or description
-            element.technology = element.technology or technology
+        element.description = element.description or _clean(getattr(comp, "c4Description", ""))
+        element.technology = element.technology or _clean(getattr(comp, "c4Technology", ""))
+        element.c4_id = element.c4_id or _clean(getattr(comp, "c4Id", ""))
+        element.tags += [tag for tag in _tags(comp) if tag not in element.tags]
         element_of[comp.id] = element
+
+    # explicit ids claim their identifiers first, so they are used verbatim
+    used = set()
+    for element in unique:
+        if element.c4_id:
+            element.identifier = _explicit_identifier(element.c4_id, used)
+    for element in unique:
+        if not element.c4_id:
+            element.identifier = _identifier(element.name, used)
 
     for comp in components.values():
         element = element_of[comp.id]
@@ -135,6 +158,7 @@ def map_diagram(components, relations):
             target=target.identifier,
             description=_clean(getattr(rel, "c4Description", "")),
             technology=_clean(getattr(rel, "c4Technology", "")),
+            tags=_tags(rel),
         )
         signature = (relationship.source, relationship.target, relationship.description, relationship.technology)
         if signature not in seen:

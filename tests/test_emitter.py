@@ -53,3 +53,19 @@ def test_empty_relationship_description_defaults_to_uses():
     components = {"1": shape("1", "Person", "User"), "2": shape("2", "Software System", "Shop")}
     relations = [SimpleNamespace(source="1", target="2", c4Description="", c4Technology="")]
     assert 'user -> shop "Uses"' in emit(map_diagram(components, relations))
+
+
+def test_c4_id_is_used_as_identifier():
+    components = {"1": shape("1", "Container", "Order API", c4Id="orders-api v2")}
+    assert "orders-api_v2 = container" in emit(map_diagram(components, []))
+
+
+def test_tags_on_elements_and_relationships():
+    components = {
+        "1": shape("1", "Person", "User"),
+        "2": shape("2", "Software System", "Bank", c4Tags="External, Legacy"),
+    }
+    relations = [SimpleNamespace(source="1", target="2", c4Description="Pays", c4Technology="", c4Tags="Async")]
+    dsl = emit(map_diagram(components, relations))
+    assert 'bank = softwareSystem "Bank" "" "External,Legacy"' in dsl
+    assert 'user -> bank "Pays" "" "Async"' in dsl

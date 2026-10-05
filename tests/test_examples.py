@@ -87,5 +87,37 @@ def test_multipage_reads_every_page_and_merges_elements(tmp_path):
     assert 'web_app = container "Web App"' in dsl
     assert 'customer -> online_shop "Places orders" "HTTPS"' in dsl
     assert 'customer -> web_app "Browses and orders" "HTTPS"' in dsl
-    assert 'order_api -> payment_provider "Charge card (order): receipt" "gRPC"' in dsl
+    assert 'orders_api = container "Order API"' in dsl  # c4Id is used as the identifier
+    assert 'orders_api -> payment_provider "Charge card (order): receipt" "gRPC"' in dsl
+    assert 'payment_provider = softwareSystem "Payment Provider" "External card payment gateway" "External"' in dsl
     assert parser.load_and_check([str(EXAMPLES / "multipage.drawio")], True)[2] == []
+
+
+def test_several_files_are_merged_into_one_workspace(tmp_path):
+    output = tmp_path / "workspace.dsl"
+    files = [str(EXAMPLES / "shop.drawio"), str(EXAMPLES / "multipage.drawio")]
+    assert main(files + ["-o", str(output)]) == 0
+    dsl = output.read_text()
+    assert dsl.count('= softwareSystem "Online Shop"') == 1
+    assert dsl.count('= container "Order API"') == 1
+    assert 'order_service = component "Order Service"' in dsl
+    assert 'customer -> online_shop "Places orders" "HTTPS"' in dsl
+
+
+def test_dry_run_prints_and_writes_nothing(tmp_path, capsys):
+    output = tmp_path / "shop.dsl"
+    assert main([str(EXAMPLES / "shop.drawio"), "-o", str(output), "--dry-run"]) == 0
+    assert not output.exists()
+    assert capsys.readouterr().out.startswith('workspace "Workspace" {')
+
+
+def test_diff_shows_changes_against_existing_output(tmp_path, capsys):
+    output = tmp_path / "shop.dsl"
+    main([str(EXAMPLES / "shop.drawio"), "-o", str(output)])
+    output.write_text(output.read_text().replace('"React"', '"Vue"'))
+    capsys.readouterr()
+    assert main([str(EXAMPLES / "shop.drawio"), "-o", str(output), "--diff"]) == 0
+    diff = capsys.readouterr().out
+    assert '-            web_app = container "Web App" "Product catalogue and checkout" "Vue"' in diff
+    assert '+            web_app = container "Web App" "Product catalogue and checkout" "React"' in diff
+    assert '"Vue"' in output.read_text()

@@ -19,6 +19,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Every page of a `.drawio` file is read. Previously only the first page was, and the rest were silently ignored.
 - Elements that appear on several pages are merged into one; duplicate relationships are merged too.
 - Relationships that are dropped (pointing at a plain shape, or with an arrow that cannot be repaired) are reported.
+- Several input files can be given; they are merged into one workspace.
+- `--dry-run` prints the generated DSL, and `--diff` prints a unified diff against the existing output file; neither writes anything.
+- `c4Id` property sets an element's DSL identifier; `c4Tags` adds tags to elements and relationships.
 - `examples/multipage.drawio` sample.
 - GitHub Actions workflow running pytest on Python 3.9 and 3.13.
 - README sections on limitations (including that draw.io layout is not preserved) and on using shapes from other draw.io libraries.
