@@ -30,6 +30,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `--report FILE` writes problems and counts as JSON.
 - `--check` runs the checks only, for scripts and the new `drawio-structurizr-check` pre-commit hook (`.pre-commit-hooks.yaml`).
 - Dockerfile with Python, Java and a checksum-pinned structurizr-cli; `publish-image` workflow smoke-tests it and pushes multi-arch images to GHCR on `v*` tags.
+- The image smoke test also checks that `--check` exits with code 1 and writes nothing, and runs the README's Docker pre-commit hook command; published images carry an SBOM.
+- README: pre-commit hooks that validate `.dsl` files with Docker or a local structurizr-cli, and a note that `drawio-structurizr-check` covers diagrams only.
 - `publish-pypi` workflow builds the package and publishes it to PyPI with trusted publishing on `v*` tags.
 - `examples/multipage.drawio` sample.
 - GitHub Actions workflow running pytest on Python 3.9 and 3.13.

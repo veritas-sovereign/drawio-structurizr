@@ -33,6 +33,29 @@ jobs:
             shop.drawio multipage.drawio -o merged.dsl -d --strict --validate --export mermaid --export-dir out
           test -s examples/merged.dsl
           ls examples/out/*.mmd
+      - name: --check (the pre-commit hook) exits 1 on problems and writes nothing
+        run: |
+          set +e
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/examples:/work" drawio-structurizr:test \
+            broken.drawio -d --check
+          status=$?
+          set -e
+          echo "exit code: $status"
+          test "$status" -eq 1
+          test ! -e examples/workspace.dsl
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/examples:/work" drawio-structurizr:test \
+            shop.drawio -d --check
+      - name: The README's Docker pre-commit hook command validates .dsl files
+        run: |
+          cp examples/merged.dsl examples/copy.dsl
+          printf 'workspace {\n model {\n  a = person "A"\n  a -> missing "x"\n }\n}\n' > examples/bad.dsl
+          hook() {
+            docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/examples:/src" --workdir /src \
+              --entrypoint sh drawio-structurizr:test \
+              -c 'for f in "$@"; do structurizr-cli validate -workspace "$f" || exit 1; done' -- "$@"
+          }
+          hook merged.dsl copy.dsl
+          if hook merged.dsl bad.dsl; then echo "invalid workspace was accepted"; exit 1; fi
 
   publish:
     needs: test
@@ -64,5 +87,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max

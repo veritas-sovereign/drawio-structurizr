@@ -209,20 +209,38 @@ repos:
         args: [-d]   # optional: also check input and return data
 ```
 
-The hook runs `drawio-structurizr --check` on the changed `.drawio` files and blocks the commit if any problem is found. To also validate committed `.dsl` files with structurizr-cli, add a local hook:
+The hook runs `drawio-structurizr --check` on the changed `.drawio` files and blocks the commit if any problem is found.
+
+> **Note:** this hook checks **diagrams**, not DSL. It never runs structurizr-cli, so a syntax error in a hand-edited `workspace.dsl` passes it. Add one of the hooks below to validate `.dsl` files too.
+
+**Validate `.dsl` files with Docker** (no Java needed; requires Docker and a published image):
 
 ```yaml
   - repo: local
     hooks:
       - id: structurizr-validate
         name: validate Structurizr workspaces
-        entry: structurizr-cli validate -workspace
-        language: system
+        language: docker_image
+        entry: >-
+          --entrypoint sh ghcr.io/veritas-sovereign/drawio-structurizr:0.2
+          -c 'for f in "$@"; do structurizr-cli validate -workspace "$f" || exit 1; done' --
         files: \.dsl$
-        require_serial: true
 ```
 
-structurizr-cli takes one workspace per run, so this local hook only works when one `.dsl` file changes at a time.
+**Validate `.dsl` files with a local structurizr-cli:**
+
+```yaml
+  - repo: local
+    hooks:
+      - id: structurizr-validate
+        name: validate Structurizr workspaces
+        language: system
+        entry: >-
+          sh -c 'for f in "$@"; do structurizr-cli validate -workspace "$f" || exit 1; done' --
+        files: \.dsl$
+```
+
+structurizr-cli validates one workspace per run, so both hooks loop over the changed files and stop at the first invalid one. With `docker_image`, pre-commit mounts the repository into the container and runs it as your user. Use `structurizr.sh` in place of `structurizr-cli` if you installed the CLI from the zip.
 
 ### Docker
 
