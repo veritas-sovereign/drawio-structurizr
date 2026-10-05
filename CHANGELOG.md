@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- README: installation from PyPI and the public Docker image, with PyPI and GHCR badges and the image tags.
+
 ## [0.2.0] - 2026-10-05
 
 ### Fixed

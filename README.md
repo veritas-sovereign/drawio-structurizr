@@ -10,10 +10,12 @@
 
 <br>
 
-🚀 [Quick Start](#quick-start) · 📋 [Diagram Conventions](#diagram-conventions) · ⚠️ [Limitations](#limitations) · 🧪 [Examples](examples/README.md) · 📝 [Changelog](CHANGELOG.md)
+🚀 [Quick Start](#quick-start) · 📦 [PyPI](https://pypi.org/project/drawio-structurizr/) · 🐳 [Docker](#docker) · 📋 [Diagram Conventions](#diagram-conventions) · ⚠️ [Limitations](#limitations) · 🧪 [Examples](examples/README.md) · 📝 [Changelog](CHANGELOG.md)
 
 <br>
 
+[![PyPI](https://img.shields.io/pypi/v/drawio-structurizr?logo=pypi&logoColor=white&label=PyPI)](https://pypi.org/project/drawio-structurizr/)
+[![Docker image](https://img.shields.io/badge/ghcr.io-drawio--structurizr-2496ed?logo=docker&logoColor=white)](https://github.com/veritas-sovereign/drawio-structurizr/pkgs/container/drawio-structurizr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-c9a227)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
 [![Output](https://img.shields.io/badge/Output-Structurizr%20DSL-438dd5)](https://docs.structurizr.com/dsl)
@@ -39,29 +41,50 @@ Both compressed and uncompressed `.drawio` files are supported, and every page o
 
 ## Quick Start
 
+With Python (3.9 or later):
+
 ```bash
-git clone https://github.com/veritas-sovereign/drawio-structurizr.git
-cd drawio-structurizr
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e .
-drawio-structurizr examples/shop.drawio -o shop.dsl
+pip install drawio-structurizr
+drawio-structurizr model.drawio -o workspace.dsl
 ```
 
-Paste `shop.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl) to see the diagrams.
+With Docker (no Python or Java needed; includes structurizr-cli for `--validate`):
 
-## Initial setup
+```bash
+docker run --rm -v "$PWD:/work" ghcr.io/veritas-sovereign/drawio-structurizr:0.2 \
+  model.drawio -o workspace.dsl --validate
+```
 
-### Prerequisites
+To try it on a sample, download [`examples/shop.drawio`](examples/shop.drawio) and use it as `model.drawio`. Paste the generated `workspace.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl) to see the diagrams.
 
-| Requirement | Version | Needed for |
+## Installation
+
+Pick one:
+
+| Option | Best for | You need |
 | --- | --- | --- |
-| Python | 3.9 or later | everything |
-| git | any | cloning the repository |
-| [draw.io](https://www.drawio.com/) desktop or web | any | drawing diagrams |
-| [structurizr-cli](https://docs.structurizr.com/cli) | any | optional `--validate` step ([setup](#validating-with-structurizr-cli)) |
-| Java | 17 or later | structurizr-cli only |
+| [PyPI](#from-pypi) | everyday use | Python 3.9+; optionally structurizr-cli (Java 17+) or Docker for `--validate` |
+| [Docker image](#docker) | CI, or machines without Python or Java | Docker |
+| [From source](#from-source) | changing the tool or running its tests | Python 3.9+, git |
 
-### Install
+You also need [draw.io](https://www.drawio.com/) (desktop or web) to draw the diagrams.
+
+### From PyPI
+
+[`drawio-structurizr`](https://pypi.org/project/drawio-structurizr/) is published to PyPI for every release.
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install drawio-structurizr                          # latest release
+pip install drawio-structurizr==0.2.0                   # or a specific version
+drawio-structurizr --help
+```
+
+Upgrade with `pip install --upgrade drawio-structurizr`. With [pipx](https://pipx.pypa.io/), `pipx install drawio-structurizr` puts the command on your `PATH` without a virtual environment.
+
+For `--validate` and `--export`, also install [structurizr-cli](#validating-with-structurizr-cli), or have Docker running: the tool then uses the `structurizr/cli` image automatically.
+
+### From source
 
 1. Clone the repository and enter it:
 
@@ -77,7 +100,7 @@ Paste `shop.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl) 
    source .venv/bin/activate          # Windows: .venv\Scripts\activate
    ```
 
-3. Install the package. Add `[dev]` to also install pytest.
+3. Install the package in editable mode. Add `[dev]` to also install pytest.
 
    ```bash
    pip install -e .                   # or: pip install -e '.[dev]'
@@ -89,15 +112,7 @@ Paste `shop.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl) 
    drawio-structurizr --help
    ```
 
-5. Optional: install structurizr-cli to validate generated workspaces. See [Validating with structurizr-cli](#validating-with-structurizr-cli) for other platforms and Docker.
-
-   ```bash
-   brew install structurizr-cli       # macOS
-   ```
-
 To use the code without installing it, run `pip install -r requirements.txt` and prefix commands with `PYTHONPATH=src`.
-
-Once a release is published, you can also install from PyPI with `pip install drawio-structurizr`, or use the [Docker image](#docker), which needs neither Python nor Java.
 
 ## Usage
 
@@ -221,7 +236,7 @@ This repository is also a [pre-commit](https://pre-commit.com/) hook. In the rep
 ```yaml
 repos:
   - repo: https://github.com/veritas-sovereign/drawio-structurizr
-    rev: v0.2.0   # a released tag
+    rev: v0.2.0   # a released tag; see Releases
     hooks:
       - id: drawio-structurizr-check
         args: [-d]   # optional: also check input and return data
@@ -231,7 +246,7 @@ The hook runs `drawio-structurizr --check` on the changed `.drawio` files and bl
 
 > **Note:** this hook checks **diagrams**, not DSL. It never runs structurizr-cli, so a syntax error in a hand-edited `workspace.dsl` passes it. Add one of the hooks below to validate `.dsl` files too.
 
-**Validate `.dsl` files with Docker** (no Java needed; requires Docker and a published image):
+**Validate `.dsl` files with Docker** (no Java needed; requires Docker):
 
 ```yaml
   - repo: local
@@ -240,7 +255,7 @@ The hook runs `drawio-structurizr --check` on the changed `.drawio` files and bl
         name: validate Structurizr workspaces
         language: docker_image
         entry: >-
-          --entrypoint sh ghcr.io/veritas-sovereign/drawio-structurizr:0.2
+          --entrypoint sh ghcr.io/veritas-sovereign/drawio-structurizr:0.2.0
           -c 'for f in "$@"; do structurizr-cli validate -workspace "$f" || exit 1; done' --
         files: \.dsl$
 ```
@@ -262,16 +277,28 @@ structurizr-cli validates one workspace per run, so both hooks loop over the cha
 
 ### Docker
 
-The image contains Python, Java and a pinned structurizr-cli (v2025.11.09, checked against its SHA-256), so `--validate` and `--export` work without installing anything else:
+The image [`ghcr.io/veritas-sovereign/drawio-structurizr`](https://github.com/veritas-sovereign/drawio-structurizr/pkgs/container/drawio-structurizr) is public and contains Python, the tool, Java and a pinned structurizr-cli (v2025.11.09, checked against its SHA-256), so `--validate` and `--export` work without installing anything else. No login is needed to pull it.
+
+| Tag | Points to |
+| --- | --- |
+| `0.2.0` | exactly that release; use this when you need the same toolchain later |
+| `0.2` | the latest `0.2.x` release |
+| `latest` | the latest release |
+
+Images are built for `linux/amd64` and `linux/arm64` (including Apple silicon). Each is about 450 MB unpacked, mostly the Java runtime, and carries an SBOM (software bill of materials).
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/veritas-sovereign/drawio-structurizr:0.2 \
+docker pull ghcr.io/veritas-sovereign/drawio-structurizr:0.2.0
+docker run --rm -v "$PWD:/work" ghcr.io/veritas-sovereign/drawio-structurizr:0.2.0 \
   model.drawio -o workspace.dsl --validate --export mermaid
 ```
 
-On Linux, add `--user "$(id -u):$(id -g)"`, otherwise the files are written as user 10001.
+- The container works in `/work`, so mount the folder that holds your diagrams there. Input and output paths are relative to that folder.
+- On Linux, add `--user "$(id -u):$(id -g)"`, otherwise the files are written as user 10001.
+- With no arguments the image prints `--help`.
+- On Windows PowerShell, use `-v "${PWD}:/work"`.
 
-Images are published to GitHub Container Registry for `linux/amd64` and `linux/arm64` when a `v*` tag is pushed, each with an SBOM (software bill of materials) attached. To build locally: `docker build -t drawio-structurizr .`
+New images are published automatically when a `v*` tag is pushed. To build one locally: `docker build -t drawio-structurizr .`
 
 #### What is pinned
 
