@@ -74,6 +74,8 @@ class BrokenRelation (Object):
         self.target = None
         self.source_point = None
         self.target_point = None
+        self.page = None
+        self.plain = False
         super().__init__(attributes)
 
     def print(self):
@@ -88,6 +90,7 @@ class Element (Object):
         self.left_top = None
         self.right_bottom = None
         self.parent_id = None
+        self.page = None
         super().__init__(attributes)
 
     def is_element_inside(self,parent_element):
@@ -304,123 +307,162 @@ def get_coordinates(collection):
         coordinates[1] = float(collection['y'])
     return coordinates
 
-# function that load from xml (.drawio)
-def load_from_xml(filename,print_statistics):
-    xml = open(filename).read()
-    components = {}
-    relations = []
-    broken_relations = []
+# split a trailing "[technology]" off a relationship description
+def split_technology(relation):
+    if relation.c4Technology:
+        return
+    m = re.search(r'\s*\[([^\[\]]*)\]\s*$', relation.c4Description)
+    if m:
+        relation.c4Technology = m.group(1).strip()
+        relation.c4Description = relation.c4Description[:m.start()].rstrip()
 
-    xml_document = ET.ElementTree(ET.fromstring(xml))
-    diagram_element = xml_document.find("diagram")
-
-    if not diagram_element is None:
+# yield the graph model root of every page (<diagram>) in a .drawio file
+def diagram_pages(filename):
+    with open(filename, encoding='utf-8') as fh:
+        xml_document = ET.ElementTree(ET.fromstring(fh.read()))
+    for diagram_element in xml_document.findall("diagram"):
         if list(diagram_element): # unencoded
-            root_node =list(diagram_element)[0]
-            #print(ET.tostring(root_node))
-        else: # encoded
+            yield list(diagram_element)[0]
+        elif diagram_element.text and diagram_element.text.strip(): # encoded
             b64 = diagram_element.text
             a = base64.b64decode(b64)
             b = pako_inflate_raw(a)
             c = js_decode_uri_component(b.decode())
-            #print(c)
-            root_node = ET.ElementTree(ET.fromstring(c))
+            yield ET.ElementTree(ET.fromstring(c))
 
-        for d in root_node.findall('root/object'):
-            if 'c4Type' in d.attrib:
-                # parse c4 relations
-                if d.attrib['c4Type'] == 'Relationship':
-                    mx_cell = d.find('mxCell')
-                    if(mx_cell is not None):
-                        have_source = False
-                        have_target = False
-                        source = None
-                        target = None
-                        if 'source' in mx_cell.attrib:
-                            source = mx_cell.attrib['source']
-                            have_source = True
-                        if 'target' in mx_cell.attrib:
-                            target = mx_cell.attrib['target']
-                            have_target = True
+# load the elements and relationships of one page
+def load_page(root_node):
+    components = {}
+    relations = []
+    broken_relations = []
 
-                        if have_source and have_target: 
-                            rel = Relation(source, target,d.attrib)
-                            if not 'c4Description' in d.attrib:
-                                rel.__setattr__('c4Description','')
-                            if not 'c4Name' in d.attrib:
-                                rel.__setattr__('c4Name','')
-                            if not 'c4Technology' in d.attrib:
-                                rel.__setattr__('c4Technology','')       
-                            relations.append(rel)
-                        else:
-                            # case then component have no source or target
-                            broken_relation = BrokenRelation(d.attrib)
-                            if have_source:
-                                broken_relation.source = source
-                            if have_target:
-                                broken_relation.target = target
+    for d in root_node.findall('root/object'):
+        if 'c4Type' in d.attrib:
+            # parse c4 relations
+            if d.attrib['c4Type'] == 'Relationship':
+                mx_cell = d.find('mxCell')
+                if(mx_cell is not None):
+                    have_source = False
+                    have_target = False
+                    source = None
+                    target = None
+                    if 'source' in mx_cell.attrib:
+                        source = mx_cell.attrib['source']
+                        have_source = True
+                    if 'target' in mx_cell.attrib:
+                        target = mx_cell.attrib['target']
+                        have_target = True
 
-                            # try to get infoermation of source and target point from relations
-                            geom = mx_cell.find('mxGeometry')
-                            if geom is not None:
-                                points = geom.findall('mxPoint')
-                                for p in points:
-                                    if 'as' in p.attrib:
-                                        if p.attrib['as'] == 'source' or p.attrib['as'] == 'sourcePoint':
-                                            broken_relation.source_point = get_coordinates(p.attrib)
-                                        if p.attrib['as'] == 'target' or p.attrib['as'] == 'targetPoint':
-                                            broken_relation.target_point = get_coordinates(p.attrib)
-                            if(not 'c4Description' in d.attrib):
-                                broken_relation.__setattr__('c4Description','')
-                            if(not 'c4Name' in d.attrib):
-                                broken_relation.__setattr__('c4Name','')
-                            if(not 'c4Technology' in d.attrib):
-                                broken_relation.__setattr__('c4Technology','')
-                            broken_relations.append(broken_relation)
-                else:
-                    # parse c4 components
-                    comp = Element(d.attrib)
+                    if have_source and have_target: 
+                        rel = Relation(source, target,d.attrib)
+                        if not 'c4Description' in d.attrib:
+                            rel.__setattr__('c4Description','')
+                        if not 'c4Name' in d.attrib:
+                            rel.__setattr__('c4Name','')
+                        if not 'c4Technology' in d.attrib:
+                            rel.__setattr__('c4Technology','')       
+                        relations.append(rel)
+                    else:
+                        # case then component have no source or target
+                        broken_relation = BrokenRelation(d.attrib)
+                        if have_source:
+                            broken_relation.source = source
+                        if have_target:
+                            broken_relation.target = target
 
-                    mx_cell = d.find('mxCell')
-                    if(mx_cell is not None):
+                        # try to get infoermation of source and target point from relations
                         geom = mx_cell.find('mxGeometry')
                         if geom is not None:
-                            comp.left_top = get_coordinates(geom.attrib)
-                            comp.right_bottom = [comp.left_top[0] + float(geom.attrib['width']),comp.left_top[1] + float(geom.attrib['height'])]
-                    components[comp.id] = comp
+                            points = geom.findall('mxPoint')
+                            for p in points:
+                                if 'as' in p.attrib:
+                                    if p.attrib['as'] == 'source' or p.attrib['as'] == 'sourcePoint':
+                                        broken_relation.source_point = get_coordinates(p.attrib)
+                                    if p.attrib['as'] == 'target' or p.attrib['as'] == 'targetPoint':
+                                        broken_relation.target_point = get_coordinates(p.attrib)
+                        if(not 'c4Description' in d.attrib):
+                            broken_relation.__setattr__('c4Description','')
+                        if(not 'c4Name' in d.attrib):
+                            broken_relation.__setattr__('c4Name','')
+                        if(not 'c4Technology' in d.attrib):
+                            broken_relation.__setattr__('c4Technology','')
+                        broken_relations.append(broken_relation)
+            else:
+                # parse c4 components
+                comp = Element(d.attrib)
 
-        # parse labels and edges for non-c4 relations            
-        labels = {}
-        for d in root_node.findall('root/mxCell'):   
-            if 'style' in d.attrib:
-                # parse edge
-                if d.attrib['style'].find('edgeStyle=') != -1:
-                    broken_relation = BrokenRelation({})
-                    broken_relation.id = d.attrib['id']
-                    if 'source' in d.attrib:
-                        broken_relation.source = d.attrib['source']
-                    if 'target' in d.attrib:
-                        broken_relation.target = d.attrib['target']
-                    broken_relation.__setattr__('c4Name','')
-                    broken_relation.__setattr__('c4Type','Relationship')
-                    broken_relation.__setattr__('c4Technology','')
-                    broken_relation.__setattr__('c4Description','')
-                    broken_relations.append(broken_relation)
-            
-            # parse label
-            if 'style' in d.attrib:
-                if d.attrib['style'].find('edgeLabel') != -1:
-                    if( 'parent' in d.attrib) and ('value' in d.attrib):
-                            labels[d.attrib['parent']] = d.attrib['value']
+                mx_cell = d.find('mxCell')
+                if(mx_cell is not None):
+                    geom = mx_cell.find('mxGeometry')
+                    if geom is not None:
+                        comp.left_top = get_coordinates(geom.attrib)
+                        comp.right_bottom = [comp.left_top[0] + float(geom.attrib['width']),comp.left_top[1] + float(geom.attrib['height'])]
+                components[comp.id] = comp
 
-        # parse technology from non c4-relations labels
-        for label in labels.keys():
-            parents = [x for x in broken_relations if x.id == label]
-            if len(parents) > 0:   
-                parents[0].c4Description = labels[label]
-                m = re.search(r'\[(.*)\]', labels[label])
-                if m:
-                    parents[0].c4Technology = m.group(1)
+    # parse labels and edges for non-c4 relations            
+    labels = {}
+    for d in root_node.findall('root/mxCell'):   
+        if 'style' in d.attrib:
+            # parse edge
+            if d.attrib['style'].find('edgeStyle=') != -1:
+                broken_relation = BrokenRelation({})
+                broken_relation.id = d.attrib['id']
+                if 'source' in d.attrib:
+                    broken_relation.source = d.attrib['source']
+                if 'target' in d.attrib:
+                    broken_relation.target = d.attrib['target']
+                broken_relation.__setattr__('c4Name','')
+                broken_relation.__setattr__('c4Type','Relationship')
+                broken_relation.__setattr__('c4Technology','')
+                broken_relation.__setattr__('c4Description','')
+                broken_relations.append(broken_relation)
+        
+        # parse label
+        if 'style' in d.attrib:
+            if d.attrib['style'].find('edgeLabel') != -1:
+                if( 'parent' in d.attrib) and ('value' in d.attrib):
+                        labels[d.attrib['parent']] = d.attrib['value']
+
+    # parse technology from non c4-relations labels
+    for label in labels.keys():
+        parents = [x for x in broken_relations if x.id == label]
+        if len(parents) > 0:   
+            parents[0].c4Description = labels[label]
+
+    return components, relations, broken_relations
+
+def _prefixed(prefix, value):
+    return None if value is None else prefix + value
+
+# function that load from xml (.drawio)
+# ids are prefixed with the page ("p1/", "p2/", ...) and id_prefix, so shapes on
+# different pages or in different files never collide
+def load_from_xml(filename,print_statistics,id_prefix=''):
+    components = {}
+    relations = []
+    broken_relations = []
+
+    for n, root_node in enumerate(diagram_pages(filename), 1):
+        page = f'{id_prefix}p{n}/'
+        page_components, page_relations, page_broken = load_page(root_node)
+        for comp in page_components.values():
+            comp.id = _prefixed(page, comp.id)
+            comp.page = page
+            components[comp.id] = comp
+        for rel in page_relations:
+            rel.id = _prefixed(page, rel.id)
+            rel.source = _prefixed(page, rel.source)
+            rel.target = _prefixed(page, rel.target)
+            relations.append(rel)
+        for br in page_broken:
+            br.id = _prefixed(page, br.id)
+            br.source = _prefixed(page, br.source)
+            br.target = _prefixed(page, br.target)
+            br.page = page
+            broken_relations.append(br)
+
+    for rel in relations + broken_relations:
+        split_technology(rel)
 
     if print_statistics==True:
         print('Number of components: ' + str(len(components)))
@@ -431,25 +473,24 @@ def load_from_xml(filename,print_statistics):
     return components, relations ,broken_relations
 
 # remove relationship that links to component that not in component list
-def fix_missing_relations(components,relations):
+def fix_missing_relations(components,relations,dropped=None):
     result_relations = []
     for rel in relations:
-        if rel.source not in components.keys():
-            rel.source = None
-        if rel.target not in components.keys():
-            rel.target = None
-
-        if rel.source is not None and rel.target is not None:
+        if rel.source in components and rel.target in components:
             result_relations.append(rel)
+        elif dropped is not None:
+            dropped.append(rel)
     return result_relations
 
 # fix broken relations
-def fix_broken_relations(components,relations,broken_relations):
+def fix_broken_relations(components,relations,broken_relations,unrepaired=None):
     i = 0
     for broken_relation in broken_relations:
         if broken_relation.source is None and broken_relation.source_point is not None:
             candidats = {}
             for comp in components.values():
+                if comp.page != broken_relation.page or comp.left_top is None:
+                    continue
                 if comp.left_top[0] <= broken_relation.source_point[0] <= comp.right_bottom[0] and comp.left_top[1] <= broken_relation.source_point[1] <= comp.right_bottom[1]:                                       
                     candidats[(comp.right_bottom[0]-comp.left_top[0])*(comp.right_bottom[1]-comp.left_top[1])] = comp.id;                  
                     
@@ -459,6 +500,8 @@ def fix_broken_relations(components,relations,broken_relations):
         if broken_relation.target is None and broken_relation.target_point is not None:
             candidats = {}
             for comp in components.values():
+                if comp.page != broken_relation.page or comp.left_top is None:
+                    continue
                 if comp.left_top[0] <= broken_relation.target_point[0] <= comp.right_bottom[0] and comp.left_top[1] <= broken_relation.target_point[1] <= comp.right_bottom[1]:
                     candidats[(comp.right_bottom[0]-comp.left_top[0])*(comp.right_bottom[1]-comp.left_top[1])] = comp.id;  
                     
@@ -468,8 +511,12 @@ def fix_broken_relations(components,relations,broken_relations):
         if broken_relation.source is not None and broken_relation.target is not None:
             i = i + 1
             #print(broken_relation.__dict__)
-            relations.append(Relation(broken_relation.source,broken_relation.target,broken_relation.__dict__))
-            
+            rel = Relation(broken_relation.source,broken_relation.target,broken_relation.__dict__)
+            rel.plain = broken_relation.plain
+            relations.append(rel)
+        elif unrepaired is not None:
+            unrepaired.append(broken_relation)
+
     return relations
 
 # function that print broken relations
@@ -488,13 +535,14 @@ def print_broken_relations(broken_relations,i):
         i = i+1
     return i
 
-# function that check relations
-def check_relations(components, relations,i,check_data):
+# function that returns the problems found in relationships
+def relation_problems(components, relations, check_data):
+    problems = []
     def component_name(component):
         if len(component.c4Name)!=0:
             return component.c4Name.replace('\n',' ')
         else:
-            return component.c4Type+":"+component.c4Description.replace('\n',' ')
+            return component.c4Type+":"+getattr(component,'c4Description','').replace('\n',' ')
 
     def relation_name(relation):
         if(len(relation.c4Description.rstrip())>0):
@@ -505,34 +553,45 @@ def check_relations(components, relations,i,check_data):
 
     for rel in relations:
         if rel.source not in components:
-            print(f'Relationship "{relation_name(rel)}" has no source element')
+            problems.append(f'Relationship "{relation_name(rel)}" has no source element')
+            continue
         if rel.target not in components:
-            print(f'Relationship "{relation_name(rel)}" has no target element')
+            problems.append(f'Relationship "{relation_name(rel)}" has no target element')
+            continue
         if 'c4Technology' in rel.__dict__:
             if rel.c4Technology=='' and components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                print(f'{i}. Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" has no technology')
-                i = i + 1
+                problems.append(f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" has no technology')
         if 'c4Description' in rel.__dict__ and check_data:
             m = re.search(r'\((.*)\)', rel.c4Description)
             if m is None:
                 if components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                    print(f'{i}. Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its input data')
-                    i = i + 1
+                    problems.append(f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its input data')
             m = re.search(r'\):(.*)', rel.c4Description)
             if m is None:
                 if components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                    print(f'{i}. Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its return data')
-                    i = i + 1
+                    problems.append(f'Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its return data')
+    return problems
+
+# function that check relations
+def check_relations(components, relations,i,check_data):
+    for problem in relation_problems(components, relations, check_data):
+        print(f'{i}. {problem}')
+        i = i + 1
     return i
 
 # function that fills parent id
 def fill_parent_id(components):
+    def area(element):
+        return (element.right_bottom[0]-element.left_top[0])*(element.right_bottom[1]-element.left_top[1])
+
     result = {}
     for comp in components.values():
+        best = None
         for parent in components.values():
-            if comp != parent:
-                if comp.is_element_inside(parent):
-                    comp.parent_id = parent.id
+            if comp != parent and comp.page == parent.page and comp.is_element_inside(parent):
+                if best is None or area(parent) < area(best):
+                    best = parent
+        comp.parent_id = best.id if best is not None else None
         result[comp.id] = comp
     return result
 
@@ -548,23 +607,62 @@ def check_inbound_outbound_relations(comp,components,relations):
         return True
 
 
-# function that checks components
-def check_components(components, relations, i):
+# function that returns the problems found in components
+def component_problems(components, relations):
+    problems = []
     for comp in components.values():
         if 'c4Description' not in comp.__dict__:
             if comp.c4Type != 'SystemScopeBoundary' and comp.c4Type != 'ContainerScopeBoundary' and comp.c4Type != 'Person':
-                print(f'{i}. {comp.c4Type} "{comp.c4Name}" has no description')
-                i = i + 1
+                problems.append(f'{comp.c4Type} "{comp.c4Name}" has no description')
         if 'c4Technology' not in comp.__dict__:
             if(comp.c4Type != 'Software System') and (comp.c4Type != 'Person') and (comp.c4Type != 'SystemScopeBoundary') and (comp.c4Type != 'ContainerScopeBoundary'):
-                print(f'{i}. {comp.c4Type} "{comp.c4Name}" has no technology')
-                i = i + 1
+                problems.append(f'{comp.c4Type} "{comp.c4Name}" has no technology')
         
         if comp.c4Type != 'SystemScopeBoundary' and comp.c4Type != 'Person' and comp.c4Type != 'ContainerScopeBoundary':
             if check_inbound_outbound_relations(comp,components,relations) is False:
-                print(f'{i}. {comp.c4Type} "{comp.c4Name}" has no incoming or outgoing relationships')
-                i = i + 1
+                problems.append(f'{comp.c4Type} "{comp.c4Name}" has no incoming or outgoing relationships')
+    return problems
+
+# function that checks components
+def check_components(components, relations, i):
+    for problem in component_problems(components, relations):
+        print(f'{i}. {problem}')
+        i = i + 1
     return i
+
+def _relation_label(rel):
+    text = (getattr(rel, 'c4Description', '') or '').replace('\n', ' ').strip()
+    return f'"{text}"' if text else f'(id {rel.id})'
+
+# load one or more .drawio files, repair arrows and run every check
+# returns (components, relations, problems)
+def load_and_check(filenames, check_data=False):
+    components = {}
+    relations = []
+    broken_relations = []
+    for k, filename in enumerate(filenames, 1):
+        prefix = f'f{k}/' if len(filenames) > 1 else ''
+        file_components, file_relations, file_broken = load_from_xml(filename, False, prefix)
+        components.update(file_components)
+        relations += file_relations
+        broken_relations += file_broken
+
+    components = fill_parent_id(components)
+    unrepaired = []
+    relations = fix_broken_relations(components, relations, broken_relations, unrepaired)
+    dropped = []
+    relations = fix_missing_relations(components, relations, dropped)
+
+    problems = []
+    for br in unrepaired:
+        if not br.plain:
+            problems.append(f'Relationship {_relation_label(br)} dropped: its arrow is not attached at both ends and could not be repaired')
+    for rel in dropped:
+        if not getattr(rel, 'plain', False) or rel.source in components or rel.target in components:
+            problems.append(f'Relationship {_relation_label(rel)} dropped: it does not connect two C4 elements')
+    problems += relation_problems(components, relations, check_data)
+    problems += component_problems(components, relations)
+    return components, relations, problems
 
 # main function
 def main(argv):

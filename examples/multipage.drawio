@@ -1,0 +1,83 @@
+<mxfile host="drawio" version="24.7.17">
+  <diagram id="context" name="System context">
+    <mxGraphModel grid="1" gridSize="10" page="1" pageWidth="1169" pageHeight="827">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <object placeholders="1" c4Type="Person" c4Name="Customer" c4Description="Buys products online" label="%c4Name%" id="customer">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="40" y="40" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Software System" c4Name="Online Shop" c4Description="Sells products to customers" label="%c4Name%" id="shop">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="400" y="60" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Software System" c4Name="Payment Provider" c4Description="External card payment gateway" c4Tags="External" label="%c4Name%" id="payments">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="800" y="60" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Relationship" c4Description="Places orders [HTTPS]" label="%c4Description%" id="r1">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="customer" target="shop">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Relationship" c4Description="Charge card (order): receipt" c4Technology="gRPC" label="%c4Description%" id="r2">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="shop" target="payments">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="containers" name="Containers">
+    <mxGraphModel grid="1" gridSize="10" page="1" pageWidth="1169" pageHeight="827">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <object placeholders="1" c4Type="Person" c4Name="Customer" label="%c4Name%" id="customer">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="40" y="200" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="SystemScopeBoundary" c4Name="Online Shop" c4Application="Software System" label="%c4Name%" id="shop">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="320" y="80" width="700" height="400" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Container" c4Name="Web App" c4Description="Product catalogue and checkout" c4Technology="React" label="%c4Name%" id="webapp">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="360" y="230" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Container" c4Name="Order API" c4Description="Accepts and stores orders" c4Technology="Python" c4Id="orders_api" label="%c4Name%" id="orderapi">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="720" y="230" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Software System" c4Name="Payment Provider" c4Description="External card payment gateway" label="%c4Name%" id="payments">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="720" y="600" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Relationship" c4Description="Browses and orders [HTTPS]" label="%c4Description%" id="r1">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="customer" target="webapp">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Relationship" c4Description="Register order (subscriber, product): order" c4Technology="JSON/HTTPS" label="%c4Description%" id="r2">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="webapp" target="orderapi">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Type="Relationship" c4Description="Charge card (order): receipt" c4Technology="gRPC" label="%c4Description%" id="r3">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="orderapi" target="payments">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -64,3 +64,28 @@ def test_legacy_excel_export(name, tmp_path, monkeypatch):
     parser.main(["-i", str(EXAMPLES / f"{name}.drawio"), "-o", "out.xlsx"])
     assert (tmp_path / "out.xlsx").stat().st_size > 0
     assert (tmp_path / "workspace.dsl").exists()
+
+
+def test_broken_reports_dropped_relationships():
+    problems = parser.load_and_check([str(EXAMPLES / "broken.drawio")], True)[2]
+    assert len(problems) == 7
+    assert any('"Export ledger (date): ledger" dropped: it does not connect two C4 elements' in p for p in problems)
+    assert any('"Send invoice (order): invoice" dropped: its arrow is not attached' in p for p in problems)
+
+
+def test_strict_mode_fails_and_writes_nothing(tmp_path):
+    output = tmp_path / "broken.dsl"
+    assert main([str(EXAMPLES / "broken.drawio"), "-o", str(output), "--strict"]) == 1
+    assert not output.exists()
+    assert main([str(EXAMPLES / "shop.drawio"), "-o", str(output), "-d", "--strict"]) == 0
+
+
+def test_multipage_reads_every_page_and_merges_elements(tmp_path):
+    dsl = convert("multipage", tmp_path)
+    assert dsl.count('= person "Customer"') == 1
+    assert dsl.count('= softwareSystem "Online Shop" "Sells products to customers" {') == 1
+    assert 'web_app = container "Web App"' in dsl
+    assert 'customer -> online_shop "Places orders" "HTTPS"' in dsl
+    assert 'customer -> web_app "Browses and orders" "HTTPS"' in dsl
+    assert 'order_api -> payment_provider "Charge card (order): receipt" "gRPC"' in dsl
+    assert parser.load_and_check([str(EXAMPLES / "multipage.drawio")], True)[2] == []

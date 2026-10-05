@@ -19,7 +19,7 @@
 [![Output](https://img.shields.io/badge/Output-Structurizr%20DSL-438dd5)](https://docs.structurizr.com/dsl)
 [![Output](https://img.shields.io/badge/Output-Excel-217346)](#validate-and-export-to-excel)
 [![Input](https://img.shields.io/badge/Input-draw.io%20C4-f08705?logo=diagramsdotnet&logoColor=white)](https://www.drawio.com/blog/c4-modelling)
-[![Tests](https://img.shields.io/badge/Tests-pytest-0a9edc?logo=pytest&logoColor=white)](#testing)
+[![Tests](https://github.com/veritas-sovereign/drawio-structurizr/actions/workflows/test.yml/badge.svg)](https://github.com/veritas-sovereign/drawio-structurizr/actions/workflows/test.yml)
 [![Last commit](https://img.shields.io/github/last-commit/veritas-sovereign/drawio-structurizr)](https://github.com/veritas-sovereign/drawio-structurizr/commits)
 
 </div>
@@ -35,7 +35,7 @@
 - **converts** them to a [Structurizr DSL](https://docs.structurizr.com/dsl) workspace, with system landscape, container and component views
 - **exports** elements and relationships to an Excel workbook
 
-Both compressed and uncompressed `.drawio` files are supported.
+Both compressed and uncompressed `.drawio` files are supported, and every page of a file is read. An element drawn on several pages (for example a context page and a container page) appears once in the workspace.
 
 ## Quick Start
 
@@ -104,21 +104,26 @@ The project provides three commands. Run them from any directory once the packag
 ### Convert to Structurizr DSL
 
 ```bash
-drawio-structurizr <input.drawio> [-o workspace.dsl] [-n NAME] [-s] [--validate]
+drawio-structurizr <input.drawio> [-o workspace.dsl] [-n NAME] [-s] [-d] [--strict] [--validate]
 ```
 
 | Option | Meaning |
 | --- | --- |
-| `input` | draw.io file to convert |
+| `input` | draw.io file to convert (all pages are read) |
 | `-o`, `--output` | output DSL file (default `workspace.dsl`) |
 | `-n`, `--name` | workspace name (default `Workspace`) |
 | `-s`, `--stats` | print element and relationship counts |
+| `-d`, `--check-data` | also check that relationships name their input and return data |
+| `--strict` | treat any problem as an error: do not write the output, exit with code 1 |
 | `--validate` | check the output with structurizr-cli, if it is on `PATH` |
+
+The [checks](#checks) always run. Problems are printed to stderr as a numbered list, and the file is still written unless `--strict` is set.
 
 Example:
 
 ```bash
 drawio-structurizr examples/shop.drawio -o shop.dsl -n "Online Shop" -s --validate
+drawio-structurizr examples/broken.drawio -d --strict      # 7 problems, exit code 1, nothing written
 ```
 
 ### Validate and export to Excel
@@ -153,11 +158,9 @@ Prints the raw cell values of an uncompressed diagram. Useful for debugging.
 ### Typical workflow
 
 1. Draw the diagram in draw.io with the C4 shapes (see [Diagram conventions](#diagram-conventions)).
-2. Run the checks and fix what they report:
-   `python -m drawio_structurizr.parser -i model.drawio -d`
-3. Generate the workspace:
-   `drawio-structurizr model.drawio -o workspace.dsl --validate`
-4. In the repository that holds your architecture, commit the `.drawio` file and the generated `workspace.dsl` together.
+2. Generate the workspace with every check enforced, and fix what it reports until it succeeds:
+   `drawio-structurizr model.drawio -o workspace.dsl -d --strict --validate`
+3. In the repository that holds your architecture, commit the `.drawio` file and the generated `workspace.dsl` together.
 
 ## Validating with structurizr-cli
 
@@ -253,7 +256,8 @@ In draw.io, open **More Shapes**, enable **C4**, and build the diagram from thos
 | ContainerScopeBoundary | `container` that holds the shapes drawn inside it |
 | Relationship | `->` |
 
-- **Nesting comes from position.** A shape drawn inside another shape's box becomes its child.
+- **Nesting comes from position.** A shape drawn inside another shape's box on the same page becomes its child. If it sits inside several boxes, the smallest one is its parent.
+- **The same element on several pages is merged.** Shapes with the same type and name (ignoring case) become one element; a boundary and a software system with the same name count as the same type. Containers and components merge only when their parents also match, so two containers called "API" in different systems stay separate. The first shape found supplies the description and technology; later ones only fill gaps.
 - **Attach every arrow** to a shape at both ends. Arrows that only touch a shape are repaired where possible.
 - **Relationship descriptions** name the data passed in each direction:
 
@@ -261,7 +265,7 @@ In draw.io, open **More Shapes**, enable **C4**, and build the diagram from thos
   action name (passed data): returned data [technologies]
   ```
 
-  For example: `Register order (subscriber, product): order [gRPC]`. Put the technology in the relationship's `c4Technology` field.
+  For example: `Register order (subscriber, product): order [gRPC]`. Put the technology in the relationship's `c4Technology` field, or end the description with `[technology]`: when `c4Technology` is empty, a trailing `[...]` is moved into it.
 
   This format is only checked when you pass `-d` to the parser, and only produces warnings. Conversion to DSL works with any description.
 
@@ -283,7 +287,7 @@ The tool reads a shape only if it has a `c4Type` property. Shapes from other lib
 
 To avoid repeating this, set up one shape per type, save them to a custom library (**File → New Library**), and draw from that library.
 
-Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends are attached to C4 shapes. Their label becomes the description, and any `[...]` in the label becomes the technology.
+Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends are attached to C4 shapes. Their label becomes the description, and a trailing `[...]` becomes the technology.
 
 ### Checks
 
@@ -293,12 +297,15 @@ Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends a
 | Technology is filled in | containers and components; relationships not involving a person |
 | Input data `( … )` and return data `): …` are named | relationships not involving a person (with `-d`) |
 | Has at least one relationship, directly or through a parent | elements, except people and boundaries |
+| Arrow is attached at both ends, or can be repaired | C4 relationships; others are dropped and reported |
+| Both ends are C4 elements | relationships; a relationship to a plain shape is dropped and reported |
 
 ## Limitations
 
 - **Layout is not preserved.** Structurizr DSL describes the model, not positions, and the generated views use `autoLayout`. Element placement from draw.io does not carry over; only elements, nesting and relationships do. You can arrange the views again in Structurizr after import.
 - **Only C4 properties are read.** Shapes without a `c4Type` are skipped. Diagrams drawn from another template need their shapes updated first (see [Using shapes from other libraries](#using-shapes-from-other-libraries)), or the tool extended: `parser.py` to read the extra shapes and `mapper.py` to map them.
-- **Nesting is based on position.** A shape must sit fully inside its parent's box. When a shape sits inside two boxes, which one counts as its parent depends on their order in the file.
+- **Nesting is based on position.** A shape must sit fully inside its parent's box on the same page.
+- **Merging is by name.** Two different elements with the same type and name are merged into one. Rename one of them.
 - **Containers must sit inside a software system.** Structurizr requires this. A container drawn on its own produces DSL that `--validate` rejects; the tool does not warn about it.
 - **structurizr-cli is archived upstream.** See [the note above](#is-it-free); Docker keeps `--validate` working.
 - **Two DSL exporters.** `python -m drawio_structurizr.parser` still writes `workspace.dsl` with its older exporter. Prefer the `drawio-structurizr` command, whose output this README describes.
@@ -309,7 +316,8 @@ Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends a
 | --- | --- |
 | [`shop.drawio`](examples/shop.drawio) | A clean diagram that passes every check |
 | [`shop-compressed.drawio`](examples/shop-compressed.drawio) | The same diagram in compressed format |
-| [`broken.drawio`](examples/broken.drawio) | Five reported problems and one repaired arrow |
+| [`multipage.drawio`](examples/multipage.drawio) | A context page and a container page, merged into one workspace |
+| [`broken.drawio`](examples/broken.drawio) | Seven reported problems and one repaired arrow |
 
 ## Testing
 
@@ -337,11 +345,13 @@ drawio-structurizr/
 │   ├── README.md                what each sample covers
 │   ├── shop.drawio              clean sample
 │   ├── shop-compressed.drawio   same sample, compressed
+│   ├── multipage.drawio         two pages merged into one workspace
 │   └── broken.drawio            sample with deliberate mistakes
 ├── tests/
 │   ├── test_examples.py         end-to-end tests on the samples
 │   ├── test_emitter.py          mapper and emitter unit tests
 │   └── test_validate.py         choice of local CLI, Docker or skip
+├── .github/workflows/test.yml   runs pytest on Python 3.9 and 3.13
 ├── pyproject.toml               package metadata and drawio-structurizr command
 ├── requirements.txt             runtime dependencies
 ├── CHANGELOG.md
@@ -374,7 +384,7 @@ Output you generate while trying the tool in this repository (`.dsl` files at th
 
 ## Contributing
 
-Issues and pull requests are welcome at [veritas-sovereign/drawio-structurizr](https://github.com/veritas-sovereign/drawio-structurizr). Run `pytest` before opening a pull request, and add a sample to `examples/` when you change how diagrams are read.
+Issues and pull requests are welcome at [veritas-sovereign/drawio-structurizr](https://github.com/veritas-sovereign/drawio-structurizr). Run `pytest` before opening a pull request (GitHub Actions runs it too), and add a sample to `examples/` when you change how diagrams are read.
 
 ## License
 

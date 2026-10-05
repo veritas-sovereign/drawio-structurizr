@@ -10,8 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Check messages and the default relationship label are now in English instead of Russian.
 - `--validate` falls back to the `structurizr/cli` Docker image when no local structurizr-cli is installed and Docker is running.
 
+- `drawio-structurizr` now runs the checks and prints problems to stderr. New options: `-d/--check-data` and `--strict` (exit code 1 and no output when problems are found).
+- When a shape sits inside several boxes, the smallest one is its parent. Previously it depended on the order of shapes in the file.
+- A trailing `[technology]` in a relationship description is moved to the technology when `c4Technology` is empty.
+
 ### Added
 
+- Every page of a `.drawio` file is read. Previously only the first page was, and the rest were silently ignored.
+- Elements that appear on several pages are merged into one; duplicate relationships are merged too.
+- Relationships that are dropped (pointing at a plain shape, or with an arrow that cannot be repaired) are reported.
+- `examples/multipage.drawio` sample.
+- GitHub Actions workflow running pytest on Python 3.9 and 3.13.
 - README sections on limitations (including that draw.io layout is not preserved) and on using shapes from other draw.io libraries.
 
 ## [0.1.0] - 2026-10-05

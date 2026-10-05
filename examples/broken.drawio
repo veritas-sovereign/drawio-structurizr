@@ -40,6 +40,24 @@
             </mxGeometry>
           </mxCell>
         </object>
+        <!-- Plain draw.io shape: not a C4 element -->
+        <mxCell id="note" value="Legacy mainframe" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="240" height="80" as="geometry" />
+        </mxCell>
+        <!-- Relationship to the plain shape: dropped and reported -->
+        <object placeholders="1" c4Type="Relationship" c4Description="Export ledger (date): ledger" c4Technology="SFTP" label="%c4Description%" id="rel3">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="reportjob" target="note">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </object>
+        <!-- Relationship whose end points at empty canvas: cannot be repaired, reported -->
+        <object placeholders="1" c4Type="Relationship" c4Description="Send invoice (order): invoice" c4Technology="SMTP" label="%c4Description%" id="rel4">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="orderapi">
+            <mxGeometry relative="1" as="geometry">
+              <mxPoint x="900" y="700" as="targetPoint" />
+            </mxGeometry>
+          </mxCell>
+        </object>
       </root>
     </mxGraphModel>
   </diagram>
