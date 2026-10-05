@@ -48,7 +48,6 @@ def _views(model: Model):
 
     for element in model.elements:
         walk(element)
-    lines.append(f"{INDENT * 2}theme default")
     return lines
 
 

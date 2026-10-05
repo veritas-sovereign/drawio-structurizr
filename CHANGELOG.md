@@ -5,11 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Fixed
+
+- Merged workspaces could fail Structurizr validation with "relationship already exists": a nested relationship implies one between the parents, which then clashed with an explicit one defined later. Outer relationships are now written first.
+
 ### Changed
 
+- Generated workspaces no longer set `theme default`, which made structurizr-cli fetch the theme over the network.
 - Check messages and the default relationship label are now in English instead of Russian.
 - `--validate` falls back to the `structurizr/cli` Docker image when no local structurizr-cli is installed and Docker is running.
-
 - `drawio-structurizr` now runs the checks and prints problems to stderr. New options: `-d/--check-data` and `--strict` (exit code 1 and no output when problems are found).
 - When a shape sits inside several boxes, the smallest one is its parent. Previously it depended on the order of shapes in the file.
 - A trailing `[technology]` in a relationship description is moved to the technology when `c4Technology` is empty.
@@ -22,6 +26,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Several input files can be given; they are merged into one workspace.
 - `--dry-run` prints the generated DSL, and `--diff` prints a unified diff against the existing output file; neither writes anything.
 - `c4Id` property sets an element's DSL identifier; `c4Tags` adds tags to elements and relationships.
+- `--export FORMAT` (repeatable) and `--export-dir` export the workspace with structurizr-cli to JSON, PlantUML, C4-PlantUML, Mermaid, DOT, Ilograph or WebSequenceDiagrams.
+- `--report FILE` writes problems and counts as JSON.
+- `--check` runs the checks only, for scripts and the new `drawio-structurizr-check` pre-commit hook (`.pre-commit-hooks.yaml`).
+- Dockerfile with Python, Java and a checksum-pinned structurizr-cli; `publish-image` workflow smoke-tests it and pushes multi-arch images to GHCR on `v*` tags.
+- `publish-pypi` workflow builds the package and publishes it to PyPI with trusted publishing on `v*` tags.
 - `examples/multipage.drawio` sample.
 - GitHub Actions workflow running pytest on Python 3.9 and 3.13.
 - README sections on limitations (including that draw.io layout is not preserved) and on using shapes from other draw.io libraries.

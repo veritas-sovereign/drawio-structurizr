@@ -97,6 +97,8 @@ Paste `shop.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl) 
 
 To use the code without installing it, run `pip install -r requirements.txt` and prefix commands with `PYTHONPATH=src`.
 
+Once a release is published, you can also install from PyPI with `pip install drawio-structurizr`, or use the [Docker image](#docker), which needs neither Python nor Java.
+
 ## Usage
 
 The project provides three commands. Run them from any directory once the package is installed.
@@ -104,7 +106,8 @@ The project provides three commands. Run them from any directory once the packag
 ### Convert to Structurizr DSL
 
 ```bash
-drawio-structurizr <input.drawio>... [-o workspace.dsl] [-n NAME] [-s] [-d] [--strict] [--dry-run | --diff] [--validate]
+drawio-structurizr <input.drawio>... [-o workspace.dsl] [-n NAME] [-s] [-d] [--strict]
+                   [--check | --dry-run | --diff] [--validate] [--export FORMAT]... [--export-dir DIR] [--report FILE]
 ```
 
 | Option | Meaning |
@@ -116,8 +119,12 @@ drawio-structurizr <input.drawio>... [-o workspace.dsl] [-n NAME] [-s] [-d] [--s
 | `-d`, `--check-data` | also check that relationships name their input and return data |
 | `--strict` | treat any problem as an error: do not write the output, exit with code 1 |
 | `--dry-run` | print the generated DSL to stdout instead of writing it |
+| `--check` | only run the checks: write nothing, exit with code 1 if there are problems (used by the [pre-commit hook](#pre-commit-hook)) |
 | `--diff` | print a unified diff between the existing output file and the newly generated DSL, without writing |
-| `--validate` | check the output with structurizr-cli, if it is on `PATH` |
+| `--validate` | check the output with [structurizr-cli](#validating-with-structurizr-cli); skipped if it is not available |
+| `--export FORMAT` | also export the workspace with structurizr-cli; repeatable. `json`, `plantuml`, `plantuml/c4plantuml`, `mermaid`, `dot`, `ilograph`, `websequencediagrams`. Fails if structurizr-cli is not available. |
+| `--export-dir DIR` | folder for exported files (default: next to the output file) |
+| `--report FILE` | write the problems and element and relationship counts as JSON |
 
 The [checks](#checks) always run. Problems are printed to stderr as a numbered list, and the file is still written unless `--strict` is set.
 
@@ -131,6 +138,25 @@ drawio-structurizr examples/shop.drawio -o shop.dsl --diff   # review changes be
 ```
 
 Problems, statistics and the "Wrote" line never go to stdout with `--dry-run` or `--diff`, so their output can be redirected to a file or piped.
+
+More examples:
+
+```bash
+drawio-structurizr model.drawio -o workspace.dsl --export mermaid --export plantuml/c4plantuml --export-dir diagrams
+drawio-structurizr model.drawio --check -d --report report.json
+```
+
+`--report` writes:
+
+```json
+{
+  "inputs": ["model.drawio"],
+  "elements": 4,
+  "relationships": 2,
+  "problemCount": 1,
+  "problems": [{ "number": 1, "message": "Container \"Web App\" has no technology" }]
+}
+```
 
 ### Validate and export to Excel
 
@@ -169,6 +195,47 @@ Prints the raw cell values of an uncompressed diagram. Useful for debugging.
 3. Generate the workspace with every check enforced, and fix what it reports until it succeeds:
    `drawio-structurizr model.drawio -o workspace.dsl -d --strict --validate`
 4. In the repository that holds your architecture, commit the `.drawio` file and the generated `workspace.dsl` together.
+
+### Pre-commit hook
+
+This repository is also a [pre-commit](https://pre-commit.com/) hook. In the repository that holds your diagrams, add to `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/veritas-sovereign/drawio-structurizr
+    rev: v0.2.0   # a released tag
+    hooks:
+      - id: drawio-structurizr-check
+        args: [-d]   # optional: also check input and return data
+```
+
+The hook runs `drawio-structurizr --check` on the changed `.drawio` files and blocks the commit if any problem is found. To also validate committed `.dsl` files with structurizr-cli, add a local hook:
+
+```yaml
+  - repo: local
+    hooks:
+      - id: structurizr-validate
+        name: validate Structurizr workspaces
+        entry: structurizr-cli validate -workspace
+        language: system
+        files: \.dsl$
+        require_serial: true
+```
+
+structurizr-cli takes one workspace per run, so this local hook only works when one `.dsl` file changes at a time.
+
+### Docker
+
+The image contains Python, Java and a pinned structurizr-cli (v2025.11.09, checked against its SHA-256), so `--validate` and `--export` work without installing anything else:
+
+```bash
+docker run --rm -v "$PWD:/work" ghcr.io/veritas-sovereign/drawio-structurizr:0.2 \
+  model.drawio -o workspace.dsl --validate --export mermaid
+```
+
+On Linux, add `--user "$(id -u):$(id -g)"`, otherwise the files are written as user 10001.
+
+Images are published to GitHub Container Registry for `linux/amd64` and `linux/arm64` when a `v*` tag is pushed. To build locally: `docker build -t drawio-structurizr .`
 
 ## Validating with structurizr-cli
 
@@ -321,7 +388,7 @@ Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends a
 
 ## Limitations
 
-- **Layout is not preserved.** Structurizr DSL describes the model, not positions, and the generated views use `autoLayout`. Element placement from draw.io does not carry over; only elements, nesting and relationships do. You can arrange the views again in Structurizr after import.
+- **Layout is not preserved.** Structurizr DSL describes the model, not positions, and the generated views use `autoLayout`. Element placement from draw.io does not carry over; only elements, nesting and relationships do. You can arrange the views again in Structurizr after import. Views use Structurizr's default styling; no theme is set, so validation needs no network access.
 - **Only C4 properties are read.** Shapes without a `c4Type` are skipped. Diagrams drawn from another template need their shapes updated first (see [Using shapes from other libraries](#using-shapes-from-other-libraries)), or the tool extended: `parser.py` to read the extra shapes and `mapper.py` to map them.
 - **Nesting is based on position.** A shape must sit fully inside its parent's box on the same page.
 - **Merging is by name.** Two different elements with the same type and name are merged into one. Rename one of them.
@@ -370,7 +437,13 @@ drawio-structurizr/
 │   ├── test_examples.py         end-to-end tests on the samples
 │   ├── test_emitter.py          mapper and emitter unit tests
 │   └── test_validate.py         choice of local CLI, Docker or skip
-├── .github/workflows/test.yml   runs pytest on Python 3.9 and 3.13
+├── .github/workflows/
+│   ├── test.yml                 runs pytest on Python 3.9 and 3.13
+│   ├── publish-image.yml        builds and smoke-tests the Docker image; pushes it to GHCR on v* tags
+│   └── publish-pypi.yml         builds the package; publishes it to PyPI on v* tags
+├── Dockerfile                   image with Python, Java and a pinned structurizr-cli
+├── .dockerignore
+├── .pre-commit-hooks.yaml       the drawio-structurizr-check pre-commit hook
 ├── pyproject.toml               package metadata and drawio-structurizr command
 ├── requirements.txt             runtime dependencies
 ├── CHANGELOG.md

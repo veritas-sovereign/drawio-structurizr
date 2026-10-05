@@ -148,11 +148,24 @@ def map_diagram(components, relations):
         else:
             model.elements.append(element)
 
-    seen = set()
+    def depth(element):
+        n = 0
+        while element.parent is not None:
+            n, element = n + 1, element.parent
+        return n
+
+    # Structurizr creates implied relationships between parents when a nested
+    # relationship is defined, and rejects an explicit one defined afterwards
+    # with the same description. Emitting outer relationships first avoids that.
+    resolved = []
     for rel in relations:
         source, target = element_of.get(rel.source), element_of.get(rel.target)
-        if source is None or target is None:
-            continue
+        if source is not None and target is not None:
+            resolved.append((depth(source) + depth(target), rel, source, target))
+    resolved.sort(key=lambda item: item[0])
+
+    seen = set()
+    for _, rel, source, target in resolved:
         relationship = ModelRelationship(
             source=source.identifier,
             target=target.identifier,

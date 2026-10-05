@@ -31,3 +31,24 @@ def test_skips_when_docker_is_not_running(monkeypatch):
 def test_skips_when_nothing_is_installed(monkeypatch):
     monkeypatch.setattr(validate.shutil, "which", fake_which(set()))
     assert validate.validate("shop.dsl")[0] is None
+
+
+def test_export_command_local(monkeypatch):
+    monkeypatch.setattr(validate.shutil, "which", fake_which({"structurizr-cli"}))
+    assert validate._command("w.dsl", "export", ["-format", "mermaid"], "out") == [
+        "/bin/structurizr-cli", "export", "-workspace", "w.dsl", "-format", "mermaid", "-output", "out"]
+
+
+def test_export_command_docker_mounts_output(monkeypatch, tmp_path):
+    monkeypatch.setattr(validate.shutil, "which", fake_which({"docker"}))
+    monkeypatch.setattr(validate, "_docker_running", lambda docker: True)
+    command = validate._command(str(tmp_path / "w.dsl"), "export", ["-format", "json"], str(tmp_path / "out"))
+    assert f"{tmp_path / 'out'}:/output" in command
+    assert command[-6:] == ["-workspace", "w.dsl", "-format", "json", "-output", "/output"]
+
+
+def test_export_without_cli_fails_clearly(monkeypatch, tmp_path):
+    monkeypatch.setattr(validate.shutil, "which", fake_which(set()))
+    ok, message = validate.export("w.dsl", "mermaid", str(tmp_path / "out"))
+    assert ok is None
+    assert "cannot export mermaid" in message

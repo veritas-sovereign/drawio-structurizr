@@ -1,0 +1,6 @@
+- id: drawio-structurizr-check
+  name: check draw.io C4 diagrams
+  description: Run the drawio-structurizr checks on changed .drawio files; fails if any problem is found.
+  entry: drawio-structurizr --check
+  language: python
+  files: \.drawio$

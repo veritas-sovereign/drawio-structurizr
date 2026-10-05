@@ -1,4 +1,4 @@
-"""Optional: validate a generated workspace with structurizr-cli.
+"""Run structurizr-cli on a generated workspace: validate it, or export it.
 
 Uses a local ``structurizr-cli`` (or ``structurizr.sh``) on PATH when one is
 installed, otherwise the ``structurizr/cli`` Docker image when Docker is
@@ -12,6 +12,12 @@ import subprocess
 CLI_NAMES = ("structurizr-cli", "structurizr.sh", "structurizr")
 DOCKER_IMAGE = "structurizr/cli"
 DOCKER_WORKDIR = "/usr/local/structurizr"
+DOCKER_OUTPUT = "/output"
+
+# formats accepted by `structurizr-cli export -format`
+EXPORT_FORMATS = ("json", "plantuml", "plantuml/c4plantuml", "mermaid", "dot", "ilograph", "websequencediagrams")
+
+NOT_FOUND = "structurizr-cli not found and Docker not running"
 
 
 def find_cli():
@@ -29,17 +35,34 @@ def _docker_running(docker):
         return False
 
 
-def _command(workspace_path):
+def _command(workspace_path, action="validate", extra=(), output_dir=None):
+    """Build the structurizr-cli command line, or return None if none is available."""
     cli = find_cli()
     if cli is not None:
-        return [cli, "validate", "-workspace", str(workspace_path)]
+        command = [cli, action, "-workspace", str(workspace_path), *extra]
+        if output_dir is not None:
+            command += ["-output", str(output_dir)]
+        return command
 
     docker = shutil.which("docker")
     if docker is not None and _docker_running(docker):
         folder, name = os.path.split(os.path.abspath(workspace_path))
-        return [docker, "run", "--rm", "-v", f"{folder}:{DOCKER_WORKDIR}",
-                DOCKER_IMAGE, "validate", "-workspace", name]
+        command = [docker, "run", "--rm", "-v", f"{folder}:{DOCKER_WORKDIR}"]
+        if output_dir is not None:
+            command += ["-v", f"{os.path.abspath(output_dir)}:{DOCKER_OUTPUT}"]
+        command += [DOCKER_IMAGE, action, "-workspace", name, *extra]
+        if output_dir is not None:
+            command += ["-output", DOCKER_OUTPUT]
+        return command
     return None
+
+
+def _run(command):
+    try:
+        result = subprocess.run(command, capture_output=True, text=True)
+    except OSError as error:
+        return None, f"could not run {command[0]}: {error}"
+    return result.returncode == 0, (result.stdout + result.stderr).strip()
 
 
 def validate(workspace_path):
@@ -49,9 +72,18 @@ def validate(workspace_path):
     """
     command = _command(workspace_path)
     if command is None:
-        return None, "structurizr-cli not found and Docker not running; skipping validation"
-    try:
-        result = subprocess.run(command, capture_output=True, text=True)
-    except OSError as error:
-        return None, f"could not run {command[0]}: {error}; skipping validation"
-    return result.returncode == 0, (result.stdout + result.stderr).strip()
+        return None, f"{NOT_FOUND}; skipping validation"
+    ok, output = _run(command)
+    return ok, output if ok is not None else f"{output}; skipping validation"
+
+
+def export(workspace_path, fmt, output_dir):
+    """Run ``structurizr-cli export`` into ``output_dir``. Returns (ok, output).
+
+    Returns ``(None, message)`` when neither the CLI nor a running Docker is available.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    command = _command(workspace_path, "export", ["-format", fmt], output_dir)
+    if command is None:
+        return None, f"{NOT_FOUND}; cannot export {fmt}"
+    return _run(command)

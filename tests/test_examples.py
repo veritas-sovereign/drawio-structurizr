@@ -121,3 +121,30 @@ def test_diff_shows_changes_against_existing_output(tmp_path, capsys):
     assert '-            web_app = container "Web App" "Product catalogue and checkout" "Vue"' in diff
     assert '+            web_app = container "Web App" "Product catalogue and checkout" "React"' in diff
     assert '"Vue"' in output.read_text()
+
+
+def test_check_writes_nothing_and_sets_exit_code(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert main([str(EXAMPLES / "broken.drawio"), "--check"]) == 1
+    assert main([str(EXAMPLES / "shop.drawio"), "--check"]) == 0
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_report_is_written_as_json(tmp_path):
+    import json
+    report = tmp_path / "report.json"
+    main([str(EXAMPLES / "broken.drawio"), "-d", "--check", "--report", str(report)])
+    data = json.loads(report.read_text())
+    assert data["problemCount"] == 7
+    assert data["problems"][0]["number"] == 1
+    assert data["elements"] == 4
+
+
+def test_outer_relationships_come_first(tmp_path):
+    # Structurizr rejects an explicit relationship that an earlier nested one already implied
+    output = tmp_path / "merged.dsl"
+    main([str(EXAMPLES / "shop.drawio"), str(EXAMPLES / "multipage.drawio"), "-o", str(output)])
+    lines = output.read_text().splitlines()
+    outer = lines.index('        online_shop -> payment_provider "Charge card (order): receipt" "gRPC"')
+    nested = lines.index('        order_service -> payment_provider "Charge card (order): receipt" "gRPC"')
+    assert outer < nested
