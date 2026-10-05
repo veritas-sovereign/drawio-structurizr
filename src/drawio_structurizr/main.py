@@ -9,7 +9,7 @@ import sys
 from . import parser
 from .emitter import emit
 from .mapper import map_diagram
-from .validate import EXPORT_FORMATS, export, validate
+from .validate import EXPORT_FORMATS, availability, export, is_available, validate
 
 
 def parse_args(argv):
@@ -33,13 +33,19 @@ def parse_args(argv):
                          help="print the generated DSL instead of writing it")
     preview.add_argument("--diff", action="store_true",
                          help="print a unified diff against the existing output file instead of writing it")
-    cli.add_argument("--validate", action="store_true", help="run structurizr-cli validate on the output")
+    cli.add_argument("--validate", action="store_true",
+                     help="run structurizr-cli validate on the output; skipped if no validator is available")
+    cli.add_argument("--validate-required", action="store_true",
+                     help="like --validate, but fail before writing anything if no validator is available")
     cli.add_argument("--export", action="append", default=[], choices=EXPORT_FORMATS, metavar="FORMAT",
                      help="also export the workspace with structurizr-cli; repeatable. "
                           "One of: " + ", ".join(EXPORT_FORMATS))
     cli.add_argument("--export-dir", help="folder for exported files (default: next to the output file)")
     cli.add_argument("--report", metavar="FILE", help="write the checks and statistics as JSON to FILE")
-    return cli.parse_args(argv)
+    args = cli.parse_args(argv)
+    if args.validate_required and (args.check or args.dry_run or args.diff):
+        cli.error("--validate-required needs an output file; it cannot be combined with --check, --dry-run or --diff")
+    return args
 
 
 def report(problems):
@@ -62,8 +68,27 @@ def write_report(path, inputs, components, relations, problems):
         fh.write("\n")
 
 
+VALIDATOR_HELP = (
+    "Install structurizr-cli (https://docs.structurizr.com/cli), start Docker to use the structurizr/cli image,\n"
+    "or run this tool from the image ghcr.io/veritas-sovereign/drawio-structurizr, which includes structurizr-cli."
+)
+
+
+def require_validator():
+    lines = ["error: --validate-required was set, but no Structurizr validator is available.", ""]
+    for what, result in availability():
+        lines.append(f"  Checked {what} {'.' * max(3, 28 - len(what))} {result}")
+    lines += ["", VALIDATOR_HELP]
+    print("\n".join(lines), file=sys.stderr)
+
+
 def main(argv=None):
     args = parse_args(argv)
+    if args.validate_required:
+        if not is_available():
+            require_validator()
+            return 1
+        args.validate = True
 
     components, relations, problems = parser.load_and_check(args.inputs, args.check_data)
     if args.stats:

@@ -35,6 +35,22 @@ def _docker_running(docker):
         return False
 
 
+def availability():
+    """Describe what was checked to find a validator, as (what, result) pairs."""
+    cli = find_cli()
+    checks = [("structurizr-cli on PATH", f"found at {cli}" if cli else "not found")]
+    docker = shutil.which("docker")
+    if docker is None:
+        checks.append(("docker", "not found"))
+    else:
+        checks.append(("docker", "running" if _docker_running(docker) else f"found at {docker}, but not running"))
+    return checks
+
+
+def is_available():
+    return find_cli() is not None or any(result == "running" for what, result in availability() if what == "docker")
+
+
 def _command(workspace_path, action="validate", extra=(), output_dir=None):
     """Build the structurizr-cli command line, or return None if none is available."""
     cli = find_cli()

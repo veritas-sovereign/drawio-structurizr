@@ -107,7 +107,7 @@ The project provides three commands. Run them from any directory once the packag
 
 ```bash
 drawio-structurizr <input.drawio>... [-o workspace.dsl] [-n NAME] [-s] [-d] [--strict]
-                   [--check | --dry-run | --diff] [--validate] [--export FORMAT]... [--export-dir DIR] [--report FILE]
+                   [--check | --dry-run | --diff] [--validate | --validate-required] [--export FORMAT]... [--export-dir DIR] [--report FILE]
 ```
 
 | Option | Meaning |
@@ -122,6 +122,7 @@ drawio-structurizr <input.drawio>... [-o workspace.dsl] [-n NAME] [-s] [-d] [--s
 | `--check` | only run the checks: write nothing, exit with code 1 if there are problems (used by the [pre-commit hook](#pre-commit-hook)) |
 | `--diff` | print a unified diff between the existing output file and the newly generated DSL, without writing |
 | `--validate` | check the output with [structurizr-cli](#validating-with-structurizr-cli); skipped if it is not available |
+| `--validate-required` | like `--validate`, but if no validator is available, fail before writing anything and list what was checked. Cannot be combined with `--check`, `--dry-run` or `--diff`. |
 | `--export FORMAT` | also export the workspace with structurizr-cli; repeatable. `json`, `plantuml`, `plantuml/c4plantuml`, `mermaid`, `dot`, `ilograph`, `websequencediagrams`. Fails if structurizr-cli is not available. |
 | `--export-dir DIR` | folder for exported files (default: next to the output file) |
 | `--report FILE` | write the problems and element and relationship counts as JSON |
@@ -337,10 +338,11 @@ docker run --rm -v "$PWD:/usr/local/structurizr" structurizr/cli validate -works
 | Result | What you see | Exit code |
 | --- | --- | --- |
 | No CLI and Docker not running | `structurizr-cli not found and Docker not running; skipping validation` | 0 |
+| No CLI and Docker not running, with `--validate-required` | an error listing what was checked; nothing is written | 1 |
 | Workspace is valid | the CLI's output | 0 |
 | Workspace is invalid | the CLI's error message | 1 |
 
-The `.dsl` file is written in every case. A missing validator skips the check rather than failing, so CI jobs without Java or Docker still pass; if you need validation to be mandatory, check for the skip message.
+The `.dsl` file is written in every case. With `--validate`, a missing validator skips the check rather than failing, so CI jobs without Java or Docker still pass. Use `--validate-required` when validation must happen.
 
 ### Run it directly
 
