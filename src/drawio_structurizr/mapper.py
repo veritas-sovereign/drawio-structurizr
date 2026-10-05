@@ -116,6 +116,8 @@ def map_diagram(components, relations, problems=None):
 
     Relationships are the same when they have the same ``c4Id``, or the same
     source, target and description (which is how Structurizr identifies them).
+    Relationships with the same ``c4Id`` but a different source, target or
+    description are still merged, keeping the first, and reported.
 
     A ``c4Id`` becomes the DSL identifier (characters that are not allowed are
     replaced); otherwise the identifier comes from the name. Problems found
@@ -243,6 +245,11 @@ def map_diagram(components, relations, problems=None):
         label = f'Relationship "{description or "Uses"}" from {_label(source.kind, source.name)} to {_label(target.kind, target.name)}'
 
         relationship = rel_by_c4_id.get(c4_id) if c4_id else None
+        if relationship is not None and (relationship.source, relationship.target, relationship.description) != signature:
+            add("C4-MERGE-006", "warning",
+                f"Relationships with c4Id {c4_id} differ: kept "
+                f'"{relationship.description or "Uses"}" from {relationship.source} to {relationship.target}, '
+                f'saw "{description or "Uses"}" from {source.identifier} to {target.identifier}')
         if relationship is None and signature in by_signature:
             relationship = by_signature[signature]
             if c4_id and relationship.c4_id and relationship.c4_id != c4_id:

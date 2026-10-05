@@ -73,3 +73,13 @@ def test_merge_warnings_reach_strict_and_report(tmp_path):
     assert main([str(FIXTURES / "same-name-conflicting-description.drawio"), "-o", str(output), "--strict"]) == 1
     assert not output.exists()
     assert main([str(FIXTURES / "same-name-conflicting-description.drawio"), "--check"]) == 1
+
+
+def test_relationships_with_same_c4id_that_differ_warn():
+    dsl, problems = convert("relationship-same-id-differs")
+    assert dsl.count("customer ->") == 1
+    assert 'customer -> shop "Orders" "HTTPS"' in dsl
+    merge = [p for p in problems if p.code.startswith("C4-MERGE")]
+    assert [p.code for p in merge] == ["C4-MERGE-006"]
+    assert merge[0].severity == "warning"
+    assert 'kept "Orders" from customer to shop, saw "Places orders" from customer to bank' in merge[0].message

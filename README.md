@@ -416,7 +416,7 @@ When the same element or relationship is drawn more than once (on several pages 
 
 The first shape found supplies the name, description and technology; later shapes fill gaps. Tags are combined.
 
-**Relationships** are the same when they have the same `c4Id`, or the same source, target and description. That is how Structurizr identifies relationships, so two arrows between the same elements with the same description always become one, even if their technologies or tags differ. Tags are combined and the first technology is kept.
+**Relationships** are the same when they have the same `c4Id`, or the same source, target and description. That is how Structurizr identifies relationships, so two arrows between the same elements with the same description always become one, even if their technologies or tags differ. Tags are combined and the first technology is kept. Relationships sharing a `c4Id` are merged even if their ends or descriptions differ, with a `C4-MERGE-006` warning.
 
 Conflicts are reported:
 
@@ -429,6 +429,7 @@ Conflicts are reported:
 | `C4-MERGE-003` | warning | different technologies for one element; the first is kept |
 | `C4-MERGE-004` | warning | different technologies for one relationship; the first is kept |
 | `C4-MERGE-005` | warning | different names for one `c4Id`; the first is kept |
+| `C4-MERGE-006` | warning | relationships with one `c4Id` have different sources, targets or descriptions; the first is kept |
 
 ### Using shapes from other libraries
 
