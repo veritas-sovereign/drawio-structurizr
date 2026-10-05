@@ -261,7 +261,7 @@ def export_to_dsl(components,relations):
         for rel in relations:
             rel_name = rel.c4Description.replace("\n"," ")
             if(len(rel_name) == 0):
-                rel_name = 'Вызов'
+                rel_name = 'Uses'
             rel_technology = rel.c4Technology.replace("\n"," ")
             if(len(rel_technology) == 0):
                 rel_technology = 'unknown'
@@ -475,16 +475,16 @@ def fix_broken_relations(components,relations,broken_relations):
 # function that print broken relations
 def print_broken_relations(broken_relations,i):
     for br in broken_relations:
-        print(f'{i}. Связь {br.id} "{br.c4Name}" не имеет начала или конца "{br.c4Description}"')
+        print(f'{i}. Relationship {br.id} "{br.c4Name}" has no source or target "{br.c4Description}"')
         if br.source is not None:
-            print(f'Начало: {br.source}')
+            print(f'Source: {br.source}')
         if br.target is not None:
-            print(f'Конец: {br.target}')
+            print(f'Target: {br.target}')
         
         if br.source_point is not None:
-            print(f'Начало: {br.source_point}')
+            print(f'Source point: {br.source_point}')
         if br.target_point is not None:
-            print(f'Конец: {br.target_point}')
+            print(f'Target point: {br.target_point}')
         i = i+1
     return i
 
@@ -505,23 +505,23 @@ def check_relations(components, relations,i,check_data):
 
     for rel in relations:
         if rel.source not in components:
-            print(f'Для связи "{relation_name(rel)}" отсутствует стартовый компонент')
+            print(f'Relationship "{relation_name(rel)}" has no source element')
         if rel.target not in components:
-            print(f'Для связи "{relation_name(rel)}" отсутствует конечный компонент')
+            print(f'Relationship "{relation_name(rel)}" has no target element')
         if 'c4Technology' in rel.__dict__:
             if rel.c4Technology=='' and components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                print(f'{i}. Для связи "{relation_name(rel)}" между "{component_name(components[rel.source])}" и "{component_name(components[rel.target])}" не указана технология')
+                print(f'{i}. Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" has no technology')
                 i = i + 1
         if 'c4Description' in rel.__dict__ and check_data:
             m = re.search(r'\((.*)\)', rel.c4Description)
             if m is None:
                 if components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                    print(f'{i}. Для связи "{relation_name(rel)}" между "{component_name(components[rel.source])}" и "{component_name(components[rel.target])}" не указаны входные данные')
+                    print(f'{i}. Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its input data')
                     i = i + 1
             m = re.search(r'\):(.*)', rel.c4Description)
             if m is None:
                 if components[rel.source].c4Type != 'Person' and components[rel.target].c4Type != 'Person':
-                    print(f'{i}. Для связи "{relation_name(rel)}" между "{component_name(components[rel.source])}" и "{component_name(components[rel.target])}" не указаны возвращаемые данные')
+                    print(f'{i}. Relationship "{relation_name(rel)}" between "{component_name(components[rel.source])}" and "{component_name(components[rel.target])}" does not name its return data')
                     i = i + 1
     return i
 
@@ -553,16 +553,16 @@ def check_components(components, relations, i):
     for comp in components.values():
         if 'c4Description' not in comp.__dict__:
             if comp.c4Type != 'SystemScopeBoundary' and comp.c4Type != 'ContainerScopeBoundary' and comp.c4Type != 'Person':
-                print(f'{i}. {comp.c4Type} "{comp.c4Name}" не указано описание')
+                print(f'{i}. {comp.c4Type} "{comp.c4Name}" has no description')
                 i = i + 1
         if 'c4Technology' not in comp.__dict__:
             if(comp.c4Type != 'Software System') and (comp.c4Type != 'Person') and (comp.c4Type != 'SystemScopeBoundary') and (comp.c4Type != 'ContainerScopeBoundary'):
-                print(f'{i}. {comp.c4Type} "{comp.c4Name}" не указана технология')
+                print(f'{i}. {comp.c4Type} "{comp.c4Name}" has no technology')
                 i = i + 1
         
         if comp.c4Type != 'SystemScopeBoundary' and comp.c4Type != 'Person' and comp.c4Type != 'ContainerScopeBoundary':
             if check_inbound_outbound_relations(comp,components,relations) is False:
-                print(f'{i}. {comp.c4Type} "{comp.c4Name}" не имеет входящих и исходящих связей')
+                print(f'{i}. {comp.c4Type} "{comp.c4Name}" has no incoming or outgoing relationships')
                 i = i + 1
     return i
 

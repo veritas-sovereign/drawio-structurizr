@@ -5,6 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- Check messages and the default relationship label are now in English instead of Russian.
+- `--validate` falls back to the `structurizr/cli` Docker image when no local structurizr-cli is installed and Docker is running.
+
+### Added
+
+- README sections on limitations (including that draw.io layout is not preserved) and on using shapes from other draw.io libraries.
+
 ## [0.1.0] - 2026-10-05
 
 ### Added

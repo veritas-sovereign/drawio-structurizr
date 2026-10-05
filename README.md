@@ -10,7 +10,7 @@
 
 <br>
 
-🚀 [Quick Start](#quick-start) · 📋 [Diagram Conventions](#diagram-conventions) · 🧪 [Examples](examples/README.md) · 📝 [Changelog](CHANGELOG.md)
+🚀 [Quick Start](#quick-start) · 📋 [Diagram Conventions](#diagram-conventions) · ⚠️ [Limitations](#limitations) · 🧪 [Examples](examples/README.md) · 📝 [Changelog](CHANGELOG.md)
 
 <br>
 
@@ -134,7 +134,7 @@ python -m drawio_structurizr.parser -i <input.drawio> -o <output.xlsx> -d -s
 | `-d` | also check that relationships name their input and return data |
 | `-s` | print element and relationship counts |
 
-Problems are printed as a numbered list. Check messages are currently in Russian. This command also writes `workspace.dsl` to the current directory, using the parser's own DSL exporter.
+Problems are printed as a numbered list. This command also writes `workspace.dsl` to the current directory, using the parser's own DSL exporter.
 
 Example, using the sample that contains deliberate mistakes:
 
@@ -167,7 +167,7 @@ Prints the raw cell values of an uncompressed diagram. Useful for debugging.
 
 Yes. structurizr-cli is open source under the Apache 2.0 license and can be used commercially. `validate` and `export` run entirely on your machine and need no account. Only its `push` and `pull` commands talk to the paid Structurizr cloud service or on-premises server, and this project does not use them.
 
-> **Note:** the upstream repository, [structurizr/cli](https://github.com/structurizr/cli), is archived. The last release is v2025.11.09, which still works. Homebrew has deprecated the formula and will disable it on 2027-02-17; after that, use the manual download or Docker.
+> **Note:** the upstream repository, [structurizr/cli](https://github.com/structurizr/cli), is archived. The last release is v2025.11.09, which still works. Homebrew has deprecated the formula and will disable it on 2027-02-17; after that, use the manual download or Docker. `--validate` falls back to Docker automatically, so it keeps working without a local install.
 
 ### Install
 
@@ -201,23 +201,33 @@ docker pull structurizr/cli
 docker run --rm -v "$PWD:/usr/local/structurizr" structurizr/cli validate -workspace shop.dsl
 ```
 
-`--validate` does not use Docker. Run the command above yourself after generating the file.
+`--validate` uses this image automatically when no local CLI is installed and Docker is running. The first run downloads the image.
 
 ### How `--validate` finds it
 
-`drawio-structurizr` searches `PATH` for `structurizr-cli`, `structurizr.sh` and `structurizr`, in that order, and runs:
+`drawio-structurizr` tries these in order and uses the first that is available:
 
-```bash
-<cli> validate -workspace <output.dsl>
-```
+1. A local CLI on `PATH`, named `structurizr-cli`, `structurizr.sh` or `structurizr`:
+
+   ```bash
+   <cli> validate -workspace <output.dsl>
+   ```
+
+2. Docker, if `docker` is on `PATH` and the Docker daemon is running. The output file's folder is mounted into the container:
+
+   ```bash
+   docker run --rm -v <output folder>:/usr/local/structurizr structurizr/cli validate -workspace <output file name>
+   ```
+
+3. Neither: validation is skipped.
 
 | Result | What you see | Exit code |
 | --- | --- | --- |
-| CLI not found | `structurizr-cli not found on PATH; skipping validation` | 0 |
+| No CLI and Docker not running | `structurizr-cli not found and Docker not running; skipping validation` | 0 |
 | Workspace is valid | the CLI's output | 0 |
 | Workspace is invalid | the CLI's error message | 1 |
 
-The `.dsl` file is written in every case. A missing CLI skips the check rather than failing, so CI jobs without Java still pass; if you need validation to be mandatory, check for the skip message.
+The `.dsl` file is written in every case. A missing validator skips the check rather than failing, so CI jobs without Java or Docker still pass; if you need validation to be mandatory, check for the skip message.
 
 ### Run it directly
 
@@ -231,7 +241,7 @@ Use `structurizr.sh` instead of `structurizr-cli` if you installed it manually.
 
 ## Diagram conventions
 
-In draw.io, open **More Shapes**, enable **C4**, and build the diagram from those shapes only.
+In draw.io, open **More Shapes**, enable **C4**, and build the diagram from those shapes. Shapes from other libraries are ignored unless you give them C4 properties (see [Using shapes from other libraries](#using-shapes-from-other-libraries)).
 
 | C4 shape (`c4Type`) | Structurizr DSL |
 | --- | --- |
@@ -253,6 +263,28 @@ In draw.io, open **More Shapes**, enable **C4**, and build the diagram from thos
 
   For example: `Register order (subscriber, product): order [gRPC]`. Put the technology in the relationship's `c4Technology` field.
 
+  This format is only checked when you pass `-d` to the parser, and only produces warnings. Conversion to DSL works with any description.
+
+### Using shapes from other libraries
+
+The tool reads a shape only if it has a `c4Type` property. Shapes from other libraries (AWS, Azure, Kubernetes, plain boxes) have none and are skipped. You can add the properties to any shape:
+
+1. Select the shape and choose **Edit Data** from the right-click menu (Cmd+M on macOS, Ctrl+M elsewhere).
+2. Add these properties, then click **Apply**:
+
+   | Property | Example |
+   | --- | --- |
+   | `c4Type` | `Container` (or `Person`, `Software System`, `Component`) |
+   | `c4Name` | `Order Handler` |
+   | `c4Description` | `Processes orders` |
+   | `c4Technology` | `AWS Lambda` |
+
+3. The shape keeps its icon and is now converted like a C4 shape.
+
+To avoid repeating this, set up one shape per type, save them to a custom library (**File → New Library**), and draw from that library.
+
+Plain draw.io arrows (not the C4 Relationship shape) are accepted if both ends are attached to C4 shapes. Their label becomes the description, and any `[...]` in the label becomes the technology.
+
 ### Checks
 
 | Check | Applies to |
@@ -261,6 +293,15 @@ In draw.io, open **More Shapes**, enable **C4**, and build the diagram from thos
 | Technology is filled in | containers and components; relationships not involving a person |
 | Input data `( … )` and return data `): …` are named | relationships not involving a person (with `-d`) |
 | Has at least one relationship, directly or through a parent | elements, except people and boundaries |
+
+## Limitations
+
+- **Layout is not preserved.** Structurizr DSL describes the model, not positions, and the generated views use `autoLayout`. Element placement from draw.io does not carry over; only elements, nesting and relationships do. You can arrange the views again in Structurizr after import.
+- **Only C4 properties are read.** Shapes without a `c4Type` are skipped. Diagrams drawn from another template need their shapes updated first (see [Using shapes from other libraries](#using-shapes-from-other-libraries)), or the tool extended: `parser.py` to read the extra shapes and `mapper.py` to map them.
+- **Nesting is based on position.** A shape must sit fully inside its parent's box. When a shape sits inside two boxes, which one counts as its parent depends on their order in the file.
+- **Containers must sit inside a software system.** Structurizr requires this. A container drawn on its own produces DSL that `--validate` rejects; the tool does not warn about it.
+- **structurizr-cli is archived upstream.** See [the note above](#is-it-free); Docker keeps `--validate` working.
+- **Two DSL exporters.** `python -m drawio_structurizr.parser` still writes `workspace.dsl` with its older exporter. Prefer the `drawio-structurizr` command, whose output this README describes.
 
 ## Examples
 
@@ -299,7 +340,8 @@ drawio-structurizr/
 │   └── broken.drawio            sample with deliberate mistakes
 ├── tests/
 │   ├── test_examples.py         end-to-end tests on the samples
-│   └── test_emitter.py          mapper and emitter unit tests
+│   ├── test_emitter.py          mapper and emitter unit tests
+│   └── test_validate.py         choice of local CLI, Docker or skip
 ├── pyproject.toml               package metadata and drawio-structurizr command
 ├── requirements.txt             runtime dependencies
 ├── CHANGELOG.md

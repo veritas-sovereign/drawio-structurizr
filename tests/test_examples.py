@@ -49,7 +49,9 @@ def test_broken_reports_every_problem(capsys):
     out = capsys.readouterr().out
     assert '"Create order"' in out
     assert 'Container "Web App"' in out
-    assert 'Container "Report Job"' in out
+    assert 'Container "Report Job" has no incoming or outgoing relationships' in out
+    assert 'Container "Web App" has no technology' in out
+    assert "does not name its input data" in out
 
 
 def test_broken_repairs_unattached_arrow(tmp_path):
