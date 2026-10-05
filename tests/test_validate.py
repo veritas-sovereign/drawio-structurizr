@@ -17,7 +17,7 @@ def test_falls_back_to_running_docker(monkeypatch, tmp_path):
     monkeypatch.setattr(validate, "_docker_running", lambda docker: True)
     command = validate._command(str(tmp_path / "shop.dsl"))
     assert command[:5] == ["/bin/docker", "run", "--rm", "-v", f"{tmp_path}:/usr/local/structurizr"]
-    assert command[5:] == ["structurizr/cli", "validate", "-workspace", "shop.dsl"]
+    assert command[5:] == ["structurizr/cli:2025.11.09", "validate", "-workspace", "shop.dsl"]
 
 
 def test_skips_when_docker_is_not_running(monkeypatch):

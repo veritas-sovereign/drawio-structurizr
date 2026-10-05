@@ -295,6 +295,8 @@ To change the structurizr-cli version, download the new `structurizr-cli.zip`, r
 Yes. structurizr-cli is open source under the Apache 2.0 license and can be used commercially. `validate` and `export` run entirely on your machine and need no account. Only its `push` and `pull` commands talk to the paid Structurizr cloud service or on-premises server, and this project does not use them.
 
 > **Note:** the upstream repository, [structurizr/cli](https://github.com/structurizr/cli), is archived. The last release is v2025.11.09, which still works. Homebrew has deprecated the formula and will disable it on 2027-02-17; after that, use the manual download or Docker. `--validate` falls back to Docker automatically, so it keeps working without a local install.
+>
+> Newer builds of structurizr-cli print a banner saying it will get no further updates and pointing to its successor, [Structurizr vNext](https://github.com/structurizr/structurizr) (Docker image `structurizr/structurizr`). This project targets structurizr-cli 2025.11.09 and does not use vNext yet. `drawio-structurizr` only shows the CLI's output when validation or export fails, so the banner does not appear on success.
 
 ### Install
 
@@ -324,8 +326,8 @@ structurizr-cli --help
 **Docker (no Java needed):**
 
 ```bash
-docker pull structurizr/cli
-docker run --rm -v "$PWD:/usr/local/structurizr" structurizr/cli validate -workspace shop.dsl
+docker pull structurizr/cli:2025.11.09
+docker run --rm -v "$PWD:/usr/local/structurizr" structurizr/cli:2025.11.09 validate -workspace shop.dsl
 ```
 
 `--validate` uses this image automatically when no local CLI is installed and Docker is running. The first run downloads the image.
@@ -340,10 +342,10 @@ docker run --rm -v "$PWD:/usr/local/structurizr" structurizr/cli validate -works
    <cli> validate -workspace <output.dsl>
    ```
 
-2. Docker, if `docker` is on `PATH` and the Docker daemon is running. The output file's folder is mounted into the container:
+2. Docker, if `docker` is on `PATH` and the Docker daemon is running. It uses `structurizr/cli:2025.11.09`, the same version as this project's image, not `latest`. The first run downloads the image. The output file's folder is mounted into the container:
 
    ```bash
-   docker run --rm -v <output folder>:/usr/local/structurizr structurizr/cli validate -workspace <output file name>
+   docker run --rm -v <output folder>:/usr/local/structurizr structurizr/cli:2025.11.09 validate -workspace <output file name>
    ```
 
 3. Neither: validation is skipped.
@@ -352,7 +354,7 @@ docker run --rm -v "$PWD:/usr/local/structurizr" structurizr/cli validate -works
 | --- | --- | --- |
 | No CLI and Docker not running | `structurizr-cli not found and Docker not running; skipping validation` | 0 |
 | No CLI and Docker not running, with `--validate-required` | an error listing what was checked; nothing is written | 1 |
-| Workspace is valid | the CLI's output | 0 |
+| Workspace is valid | `Validated <output.dsl>` | 0 |
 | Workspace is invalid | the CLI's error message | 1 |
 
 The `.dsl` file is written in every case. With `--validate`, a missing validator skips the check rather than failing, so CI jobs without Java or Docker still pass. Use `--validate-required` when validation must happen.

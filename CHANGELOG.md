@@ -7,6 +7,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- The Docker fallback for `--validate` and `--export` used `structurizr/cli:latest`, a newer build than the version pinned in this project's image. It now uses `structurizr/cli:2025.11.09`.
+- structurizr-cli's output (including its deprecation banner) is shown only when validation or export fails; success prints `Validated <file>`.
 - Relationships between the same elements with the same description but different technologies were both emitted, which Structurizr rejects. They are now merged (Structurizr identifies relationships by source, target and description), keeping the first technology and combining tags.
 - Element names are compared with `strip().casefold()` instead of `lower()`.
 - Merged workspaces could fail Structurizr validation with "relationship already exists": a nested relationship implies one between the parents, which then clashed with an explicit one defined later. Outer relationships are now written first.

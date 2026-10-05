@@ -133,20 +133,22 @@ def main(argv=None):
     status = 0
     if args.validate:  # not reached with --check, --dry-run or --diff
         ok, output = validate(args.output)
-        if output:
-            print(output)
-        if ok is False:
-            status = 1
+        if ok:
+            print(f"Validated {args.output}")
+        else:
+            # the CLI's own output (including its banner) only matters when something went wrong
+            print(output, file=sys.stderr if ok is False else sys.stdout)
+            if ok is False:
+                status = 1
 
     export_dir = args.export_dir or os.path.dirname(os.path.abspath(args.output))
     for fmt in args.export:
         ok, output = export(args.output, fmt, export_dir)
-        if output:
-            print(output)
-        if ok is not True:
-            status = 1
-        else:
+        if ok is True:
             print(f"Exported {fmt} to {export_dir}")
+        else:
+            print(output, file=sys.stderr)
+            status = 1
     return status
 
 

@@ -10,7 +10,8 @@ import shutil
 import subprocess
 
 CLI_NAMES = ("structurizr-cli", "structurizr.sh", "structurizr")
-DOCKER_IMAGE = "structurizr/cli"
+# same structurizr-cli version as the Dockerfile; keep the two in step
+DOCKER_IMAGE = "structurizr/cli:2025.11.09"
 DOCKER_WORKDIR = "/usr/local/structurizr"
 DOCKER_OUTPUT = "/output"
 

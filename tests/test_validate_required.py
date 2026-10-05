@@ -30,12 +30,15 @@ def test_valid_workspace_passes(bin_dir, tmp_path, capsys):
     output = tmp_path / "shop.dsl"
     assert main([SHOP, "-o", str(output), "--validate-required"]) == 0
     assert output.exists()
-    assert f"stub validate {output}" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert f"Validated {output}" in out
+    assert "stub validate" not in out  # validator output is only shown on failure
 
 
-def test_invalid_workspace_fails(bin_dir, tmp_path):
+def test_invalid_workspace_fails(bin_dir, tmp_path, capsys):
     stub_cli(bin_dir, 1)
     assert main([SHOP, "-o", str(tmp_path / "shop.dsl"), "--validate-required"]) == 1
+    assert "stub validate" in capsys.readouterr().err
 
 
 def test_missing_validator_fails_before_writing(tmp_path, monkeypatch, capsys):
