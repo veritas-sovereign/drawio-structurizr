@@ -1,0 +1,339 @@
+<div align="center">
+
+# drawio-structurizr
+
+### Turn draw.io C4 diagrams into checked, version-controlled Structurizr models
+
+<br>
+
+[![Full documentation](https://img.shields.io/badge/📖_full_documentation-github.com%2Fveritas--sovereign%2Fdrawio--structurizr-2f7ed8?style=for-the-badge&labelColor=555555)](https://github.com/veritas-sovereign/drawio-structurizr#readme)
+
+<br>
+
+🚀 [Quick Start](#quick-start) · 📋 [Diagram Conventions](#diagram-conventions) · 🧪 [Examples](examples/README.md) · 📝 [Changelog](CHANGELOG.md)
+
+<br>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-c9a227)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?logo=python&logoColor=white)](pyproject.toml)
+[![Output](https://img.shields.io/badge/Output-Structurizr%20DSL-438dd5)](https://docs.structurizr.com/dsl)
+[![Output](https://img.shields.io/badge/Output-Excel-217346)](#validate-and-export-to-excel)
+[![Input](https://img.shields.io/badge/Input-draw.io%20C4-f08705?logo=diagramsdotnet&logoColor=white)](https://www.drawio.com/blog/c4-modelling)
+[![Tests](https://img.shields.io/badge/Tests-pytest-0a9edc?logo=pytest&logoColor=white)](#testing)
+[![Last commit](https://img.shields.io/github/last-commit/veritas-sovereign/drawio-structurizr)](https://github.com/veritas-sovereign/drawio-structurizr/commits)
+
+</div>
+
+---
+
+## Overview
+
+`drawio-structurizr` reads C4 diagrams drawn with draw.io's C4 shape library and:
+
+- **checks** them for missing descriptions, technologies and data flow details
+- **repairs** arrows that touch a shape without being attached to it
+- **converts** them to a [Structurizr DSL](https://docs.structurizr.com/dsl) workspace, with system landscape, container and component views
+- **exports** elements and relationships to an Excel workbook
+
+Both compressed and uncompressed `.drawio` files are supported.
+
+## Quick Start
+
+```bash
+git clone https://github.com/veritas-sovereign/drawio-structurizr.git
+cd drawio-structurizr
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e .
+drawio-structurizr examples/shop.drawio -o shop.dsl
+```
+
+Paste `shop.dsl` into the [Structurizr DSL editor](https://structurizr.com/dsl) to see the diagrams.
+
+## Initial setup
+
+### Prerequisites
+
+| Requirement | Version | Needed for |
+| --- | --- | --- |
+| Python | 3.9 or later | everything |
+| git | any | cloning the repository |
+| [draw.io](https://www.drawio.com/) desktop or web | any | drawing diagrams |
+| [structurizr-cli](https://docs.structurizr.com/cli) | any | optional `--validate` step ([setup](#validating-with-structurizr-cli)) |
+| Java | 17 or later | structurizr-cli only |
+
+### Install
+
+1. Clone the repository and enter it:
+
+   ```bash
+   git clone https://github.com/veritas-sovereign/drawio-structurizr.git
+   cd drawio-structurizr
+   ```
+
+2. Create and activate a virtual environment. `.venv/` is already git-ignored.
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate          # Windows: .venv\Scripts\activate
+   ```
+
+3. Install the package. Add `[dev]` to also install pytest.
+
+   ```bash
+   pip install -e .                   # or: pip install -e '.[dev]'
+   ```
+
+4. Check the install:
+
+   ```bash
+   drawio-structurizr --help
+   ```
+
+5. Optional: install structurizr-cli to validate generated workspaces. See [Validating with structurizr-cli](#validating-with-structurizr-cli) for other platforms and Docker.
+
+   ```bash
+   brew install structurizr-cli       # macOS
+   ```
+
+To use the code without installing it, run `pip install -r requirements.txt` and prefix commands with `PYTHONPATH=src`.
+
+## Usage
+
+The project provides three commands. Run them from any directory once the package is installed.
+
+### Convert to Structurizr DSL
+
+```bash
+drawio-structurizr <input.drawio> [-o workspace.dsl] [-n NAME] [-s] [--validate]
+```
+
+| Option | Meaning |
+| --- | --- |
+| `input` | draw.io file to convert |
+| `-o`, `--output` | output DSL file (default `workspace.dsl`) |
+| `-n`, `--name` | workspace name (default `Workspace`) |
+| `-s`, `--stats` | print element and relationship counts |
+| `--validate` | check the output with structurizr-cli, if it is on `PATH` |
+
+Example:
+
+```bash
+drawio-structurizr examples/shop.drawio -o shop.dsl -n "Online Shop" -s --validate
+```
+
+### Validate and export to Excel
+
+```bash
+python -m drawio_structurizr.parser -i <input.drawio> -o <output.xlsx> -d -s
+```
+
+| Option | Meaning |
+| --- | --- |
+| `-i` | draw.io file to read |
+| `-o` | Excel file to write elements and relationships to |
+| `-d` | also check that relationships name their input and return data |
+| `-s` | print element and relationship counts |
+
+Problems are printed as a numbered list. Check messages are currently in Russian. This command also writes `workspace.dsl` to the current directory, using the parser's own DSL exporter.
+
+Example, using the sample that contains deliberate mistakes:
+
+```bash
+python -m drawio_structurizr.parser -i examples/broken.drawio -o broken.xlsx -d -s
+```
+
+### Dump cell values
+
+```bash
+python -m drawio_structurizr.dump -i <input.drawio>
+```
+
+Prints the raw cell values of an uncompressed diagram. Useful for debugging.
+
+### Typical workflow
+
+1. Draw the diagram in draw.io with the C4 shapes (see [Diagram conventions](#diagram-conventions)).
+2. Run the checks and fix what they report:
+   `python -m drawio_structurizr.parser -i model.drawio -d`
+3. Generate the workspace:
+   `drawio-structurizr model.drawio -o workspace.dsl --validate`
+4. In the repository that holds your architecture, commit the `.drawio` file and the generated `workspace.dsl` together.
+
+## Validating with structurizr-cli
+
+[structurizr-cli](https://docs.structurizr.com/cli) is the official command-line tool for Structurizr DSL workspaces. The `--validate` option uses it to check that the generated `.dsl` file parses and is a valid model.
+
+### Is it free?
+
+Yes. structurizr-cli is open source under the Apache 2.0 license and can be used commercially. `validate` and `export` run entirely on your machine and need no account. Only its `push` and `pull` commands talk to the paid Structurizr cloud service or on-premises server, and this project does not use them.
+
+> **Note:** the upstream repository, [structurizr/cli](https://github.com/structurizr/cli), is archived. The last release is v2025.11.09, which still works. Homebrew has deprecated the formula and will disable it on 2027-02-17; after that, use the manual download or Docker.
+
+### Install
+
+All options except Docker need Java 17 or later. Check with `java -version`.
+
+**macOS (Homebrew):**
+
+```bash
+brew install structurizr-cli
+structurizr-cli --help
+```
+
+**macOS, Linux or Windows (manual download):**
+
+1. Download `structurizr-cli.zip` from the [latest release](https://github.com/structurizr/cli/releases/latest).
+2. Unzip it, for example to `~/tools/structurizr-cli`.
+3. Add that folder to your `PATH`. On macOS or Linux:
+
+   ```bash
+   echo 'export PATH="$HOME/tools/structurizr-cli:$PATH"' >> ~/.zshrc
+   source ~/.zshrc
+   structurizr.sh --help
+   ```
+
+   On Windows, add the folder to `PATH` in System Properties and run `structurizr.bat --help`.
+
+**Docker (no Java needed):**
+
+```bash
+docker pull structurizr/cli
+docker run --rm -v "$PWD:/usr/local/structurizr" structurizr/cli validate -workspace shop.dsl
+```
+
+`--validate` does not use Docker. Run the command above yourself after generating the file.
+
+### How `--validate` finds it
+
+`drawio-structurizr` searches `PATH` for `structurizr-cli`, `structurizr.sh` and `structurizr`, in that order, and runs:
+
+```bash
+<cli> validate -workspace <output.dsl>
+```
+
+| Result | What you see | Exit code |
+| --- | --- | --- |
+| CLI not found | `structurizr-cli not found on PATH; skipping validation` | 0 |
+| Workspace is valid | the CLI's output | 0 |
+| Workspace is invalid | the CLI's error message | 1 |
+
+The `.dsl` file is written in every case. A missing CLI skips the check rather than failing, so CI jobs without Java still pass; if you need validation to be mandatory, check for the skip message.
+
+### Run it directly
+
+```bash
+structurizr-cli validate -workspace shop.dsl                       # check the workspace
+structurizr-cli export -workspace shop.dsl -format plantuml        # export to PlantUML
+structurizr-cli export -workspace shop.dsl -format mermaid         # export to Mermaid
+```
+
+Use `structurizr.sh` instead of `structurizr-cli` if you installed it manually.
+
+## Diagram conventions
+
+In draw.io, open **More Shapes**, enable **C4**, and build the diagram from those shapes only.
+
+| C4 shape (`c4Type`) | Structurizr DSL |
+| --- | --- |
+| Person | `person` |
+| Software System | `softwareSystem` |
+| Container | `container` |
+| Component | `component` |
+| SystemScopeBoundary | `softwareSystem` that holds the shapes drawn inside it |
+| ContainerScopeBoundary | `container` that holds the shapes drawn inside it |
+| Relationship | `->` |
+
+- **Nesting comes from position.** A shape drawn inside another shape's box becomes its child.
+- **Attach every arrow** to a shape at both ends. Arrows that only touch a shape are repaired where possible.
+- **Relationship descriptions** name the data passed in each direction:
+
+  ```
+  action name (passed data): returned data [technologies]
+  ```
+
+  For example: `Register order (subscriber, product): order [gRPC]`. Put the technology in the relationship's `c4Technology` field.
+
+### Checks
+
+| Check | Applies to |
+| --- | --- |
+| Description is filled in | elements, except people and boundaries |
+| Technology is filled in | containers and components; relationships not involving a person |
+| Input data `( … )` and return data `): …` are named | relationships not involving a person (with `-d`) |
+| Has at least one relationship, directly or through a parent | elements, except people and boundaries |
+
+## Examples
+
+| File | What it shows |
+| --- | --- |
+| [`shop.drawio`](examples/shop.drawio) | A clean diagram that passes every check |
+| [`shop-compressed.drawio`](examples/shop-compressed.drawio) | The same diagram in compressed format |
+| [`broken.drawio`](examples/broken.drawio) | Five reported problems and one repaired arrow |
+
+## Testing
+
+```bash
+pip install -e '.[dev]'
+pytest
+```
+
+The tests run the samples in `examples/` end to end and cover the mapper and emitter on their own.
+
+## Project structure
+
+```
+drawio-structurizr/
+├── src/
+│   └── drawio_structurizr/      Python package
+│       ├── __init__.py          package version
+│       ├── main.py              drawio-structurizr command
+│       ├── parser.py            reads .drawio files, runs checks, exports Excel and legacy DSL
+│       ├── mapper.py            maps C4 shapes to Structurizr DSL constructs
+│       ├── emitter.py           writes a .dsl file from the mapped model
+│       ├── validate.py          optional structurizr-cli validation
+│       └── dump.py              prints the cell values of a diagram
+├── examples/
+│   ├── README.md                what each sample covers
+│   ├── shop.drawio              clean sample
+│   ├── shop-compressed.drawio   same sample, compressed
+│   └── broken.drawio            sample with deliberate mistakes
+├── tests/
+│   ├── test_examples.py         end-to-end tests on the samples
+│   └── test_emitter.py          mapper and emitter unit tests
+├── pyproject.toml               package metadata and drawio-structurizr command
+├── requirements.txt             runtime dependencies
+├── CHANGELOG.md
+├── LICENSE
+├── .editorconfig
+├── .gitattributes
+└── .gitignore
+```
+
+The package lives under `src/` so it can only be imported once installed, and so it is not mistaken for a second copy of the repository folder.
+
+Output you generate while trying the tool in this repository (`.dsl` files at the top level or in `examples/`, and any `.xlsx`) is git-ignored.
+
+### How a conversion works
+
+```
+.drawio ──► parser.py ──► mapper.py ──► emitter.py ──► workspace.dsl ──► validate.py (optional)
+             read,          C4 shapes      DSL text                       structurizr-cli
+             repair,        to model
+             check
+```
+
+## Naming conventions
+
+- **Repository, distribution and command:** `drawio-structurizr` (kebab-case)
+- **Python package:** `drawio_structurizr` (snake_case), in `src/`
+- **Modules:** short snake_case nouns, without a `drawio_` prefix, since the package name already provides it
+- **Product name in prose:** "draw.io"; in code and file extensions: `drawio`
+- **C4 terms:** element, relationship, software system, container, component, person
+
+## Contributing
+
+Issues and pull requests are welcome at [veritas-sovereign/drawio-structurizr](https://github.com/veritas-sovereign/drawio-structurizr). Run `pytest` before opening a pull request, and add a sample to `examples/` when you change how diagrams are read.
+
+## License
+
+Released under the [MIT License](LICENSE).

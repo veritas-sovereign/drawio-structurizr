@@ -1,0 +1,46 @@
+<mxfile host="drawio" version="24.7.17">
+  <diagram id="broken" name="Diagram with problems">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" page="1" pageWidth="1169" pageHeight="827">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <!-- Container without a technology -->
+        <object placeholders="1" c4Name="Web App" c4Type="Container" c4Description="Product catalogue" label="&lt;b&gt;%c4Name%&lt;/b&gt;" id="webapp">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#23A2D9;fontColor=#ffffff;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="40" y="40" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Order API" c4Type="Container" c4Technology="Java" c4Description="Accepts orders" label="&lt;b&gt;%c4Name%&lt;/b&gt;" id="orderapi">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#23A2D9;fontColor=#ffffff;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="440" y="40" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Stock DB" c4Type="Container" c4Technology="PostgreSQL" c4Description="Stock levels" label="&lt;b&gt;%c4Name%&lt;/b&gt;" id="stockdb">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#23A2D9;fontColor=#ffffff;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="440" y="280" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <!-- Container with no relationships -->
+        <object placeholders="1" c4Name="Report Job" c4Type="Container" c4Technology="Python" c4Description="Nightly reports" label="&lt;b&gt;%c4Name%&lt;/b&gt;" id="reportjob">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#23A2D9;fontColor=#ffffff;metaEdit=1;" vertex="1" parent="1">
+            <mxGeometry x="40" y="280" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <!-- Relationship without technology and without input/return data -->
+        <object placeholders="1" c4Type="Relationship" c4Description="Create order" label="%c4Description%" id="rel1">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="webapp" target="orderapi">
+            <mxGeometry relative="1" as="geometry" />
+          </mxCell>
+        </object>
+        <!-- Relationship whose arrow head touches Stock DB but is not attached to it -->
+        <object placeholders="1" c4Type="Relationship" c4Description="Reserve stock (order): reservation" c4Technology="JDBC" label="%c4Description%" id="rel2">
+          <mxCell style="endArrow=blockThin;html=1;endFill=1;metaEdit=1;" edge="1" parent="1" source="orderapi">
+            <mxGeometry relative="1" as="geometry">
+              <mxPoint x="560" y="290" as="targetPoint" />
+            </mxGeometry>
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
